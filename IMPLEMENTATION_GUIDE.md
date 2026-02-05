@@ -1,321 +1,114 @@
 # 🔧 Guide d'Implémentation - Phase 3
 
 **Date**: 2026-02-05
-**Phase**: 3 - Implémentation
-**Objectif**: Finaliser l'implémentation des modules `scraper.py` et `ui_forms.py`
+**Phase**: 3 - Implémentation (en cours)
+**Objectif**: Finaliser le moteur de scraping restructuré (`scraper.py` + `ui_forms.py`) et basculer les hooks dans le point d'entrée refactoré.
 
 ---
 
-## 📋 État Actuel
+## 📋 État actuel
 
-### ✅ Complètement Implémenté
-- **config.py** (200 lignes) - 100%
-- **utils.py** (400 lignes) - 100%
-- **settings.py** (220 lignes) - 100%
+### ✅ Modules opérationnels
+- `config.py` (200 lignes) : constantes, flags, patterns
+- `utils.py` (400 lignes) : helpers HTTP, texte, logging, parse
+- `settings.py` (220 lignes) : gestion XML + traduction (version allégée mais fonctionnelle)
 
-### 🏗️ Structure Créée (TODO markers)
-- **scraper.py** (380 lignes) - Structure complète, logique à implémenter
-- **ui_forms.py** (650 lignes) - Composants UI créés, certains détails à compléter
-
-**Total**: ~1850 lignes structurées
-
----
-
-## 🎯 Stratégie d'Implémentation
-
-### Approche Recommandée: **Progressive et Testable**
-
-Au lieu de tout copier d'un coup, implémenter fonction par fonction en testant au fur et à mesure.
+### 🔄 Modules en cours
+- `scraper.py` : `parseSerieInfo`, `parseAlbumInfo`, `parseAlbumInfo_bdbase`, `AlbumChooser`, `parseRevueInfo` et `SetAlbumInformation` sont portés ; `BD_start()`/`QuickScrapeBDbase()` et les helpers `search_series`, `find_best_match`, `normalize_album_number` restent à intégrer.
+- `ui_forms.py` : dialogues créés (`ProgressBarDialog`, `BDConfigForm`, `SeriesForm`, `DirectScrape`), mais les événements/configurations ne sont pas encore branchés.
+- `BDbaseScraper.py` : logique d’origine toujours présente, il doit devenir un orchestrateur minimal (
+  import `scraper`, `settings`, `ui_forms` + exposer les hooks ComicRack).
 
 ---
 
-## 📦 scraper.py - Plan d'Implémentation
+## 🎯 Stratégie de finalisation
 
-### Priorité 1: Fonctions Core (Critiques)
+### 1. Assurer le moteur de scraping
+- Compléter `BD_start()` pour qu’il boucle sur les livres, invoque `parseSerieInfo()`, puis `parseAlbumInfo()`/`parseRevueInfo()` selon la nature du lien.
+- Exposer `QuickScrapeBDbase()` comme façade qui appelle `scraper.BD_start()` (option `book` + `cLink`).
+- Ajouter l’actualisation `SeriesForm`/`ProgressBarDialog` dans la chaîne de décision (remplacer les appels directs aux dialogues dans le fichier original).
+- Tester `parseSerieInfo()`/`parseAlbumInfo()` avec quelques URL (révision manuelle des logs pour vérifier que `book.Number`, `Title`, `ISBN`, etc. sont remplis).
 
-#### 1. `parseAlbumInfo_bdbase()` ⚠️ CRITIQUE
-**Localisation originale**: Lignes 1099-1568 (~470 lignes)
-**Complexité**: Haute - Parse toutes les métadonnées
+### 2. Stabiliser les helpers
+- Implémenter `search_series()` + `find_best_match()` pour rechercher une série lorsque le `serieUrl` n’est pas déjà renseigné.
+- Remplir `download_cover()` afin de récupérer la couverture via `og:image` (le flag `BDBASE_DISABLE_COVER` reste respecté).
+- Ajouter `normalize_album_number()`/`is_oneshot()`/`extract_authors_from_html()` pour éviter duplication dans `scraper.py`.
 
-**À implémenter**:
-- Extraction série (BDBASE_ALBUM_SERIE)
-- Extraction titre (ALBUM_TITLE_PATTERN)
-- Gestion numéros (Number, AlternateNumber, HS)
-- Extraction éditeur/collection
-- Extraction résumé
-- Parsing détails (date, ISBN, pages, etc.)
-- Extraction auteurs (writer, penciller, colorist, etc.)
-- Téléchargement couverture
-- Gestion LD+JSON fallback
-
-**Méthode**:
-```python
-# Copier du fichier original (lignes 1099-1568)
-# Adapter les imports pour utiliser nos modules:
-# - config.CB* au lieu de variables globales
-# - utils.parseName(), strip_tags(), etc.
-# - settings.Trans() pour traductions
-```
-
-#### 2. `parseSerieInfo()` ⚠️ CRITIQUE
-**Localisation originale**: Lignes 667-1072 (~405 lignes)
-**Complexité**: Haute - Gère séries et revues
-
-**À implémenter**:
-- Téléchargement page série
-- Extraction métadonnées série (genre, statut, résumé, note)
-- Gestion revues (/revue-* URLs)
-- Liste d'albums
-- Choix utilisateur (AlbumChooser)
-- Mise à jour book avec info série
-
-**Méthode**:
-```python
-# Copier lignes 667-1072
-# Adapter imports et variables globales
-```
-
-#### 3. `parseAlbumInfo()` 🔶 IMPORTANT
-**Localisation originale**: Lignes 1075-1098 (~24 lignes)
-**Complexité**: Basse - Wrapper
-
-**À implémenter**:
-```python
-def parseAlbumInfo(book, pageUrl, num, lDirect=False):
-    # Télécharge HTML
-    albumHTML = _read_url(pageUrl, False)
-    # Appelle parseAlbumInfo_bdbase
-    return parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML)
-```
-
-### Priorité 2: Fonctions de Support
-
-#### 4. `BD_start()` 🔶 IMPORTANT
-**Localisation originale**: Lignes 207-640 (~433 lignes)
-**Complexité**: Haute - Point d'entrée principal
-
-**À implémenter** (après parseSerieInfo/parseAlbumInfo):
-- Chargement settings
-- Boucle sur books
-- Extraction info livre (series, number)
-- Recherche série
-- Appel parseSerieInfo/parseAlbumInfo
-- Gestion erreurs
-- Statistiques finales
-
-#### 5. `AlbumChooser()` 🔷 MOYEN
-**Localisation originale**: Dispersée
-**Complexité**: Moyenne - UI selection
-
-**À implémenter**:
-```python
-def AlbumChooser(ListAlbum):
-    from ui_forms import SeriesForm, FormType
-    form = SeriesForm("Albums", ListAlbum, FormType.ALBUM)
-    result = form.ShowDialog()
-    if result == DialogResult.OK:
-        return NewLink  # Variable globale mise à jour par form
-    return None
-```
-
-#### 6. `parseRevueInfo()` 🔷 MOYEN
-**Localisation originale**: Lignes ~1570-1660 (~90 lignes)
-**Pour magazines/revues uniquement**
-
-#### 7. Fonctions Helper 🔵 FACILE
-- `download_cover()` - Lignes ~600-640
-- `search_series()` - À extraire
-- `SetAlbumInformation()` - Lignes 644-666
-- `SetSerieId()` - À extraire
+### 3. Finaliser l’UI et les hooks
+- Compléter les onglets de `BDConfigForm`, binding avec `settings.LoadSetting()/SaveSetting()`, et événements (`button_Click`, `AllowUserChoice`, `PopUpEditionForm`).
+- Vérifier que `DirectScrape` et `SeriesForm` communiquent correctement (mettre à jour `NewLink`, `NewSeries`).
+- Recréer `BDbaseScraper.py` comme pont : importer `scraper`, `settings`, `ui_forms`, gérer les hooks `@Hook Books`, `@Hook ConfigScript`, etc.
+- Ajouter le support `settings.get_plugin_path()` pour les assets (icônes, App.Config) dans la nouvelle structure.
 
 ---
 
-## 📦 ui_forms.py - Plan d'Implémentation
+## 💻 Méthode de travail
 
-### État Actuel
-- ✅ Squelette complet de toutes les classes
-- ✅ Composants UI principaux créés
-- 🔷 Certains détails à compléter (event handlers, layouts)
-
-### À Compléter
-
-#### 1. `BDConfigForm` 🔶 IMPORTANT
-**Localisation originale**: Lignes 2026-2856 (~830 lignes)
-
-**TODO**:
-- Compléter les 3 onglets (tabPage1, tabPage2, tabPage3)
-- Ajouter tous les contrôles (~50 checkboxes, textboxes, radio buttons)
-- Implémenter `button_Click()` complètement (sauvegarder tous settings)
-
-**Méthode**: Copier la logique complète depuis l'original
-
-#### 2. `ProgressBarDialog` 🔷 MOYEN
-**Localisation originale**: Lignes ~1580-1670
-
-**TODO**:
-- Ajouter ProgressBar component
-- Implémenter Update() avec mise à jour visuelle
-- Ajouter Cancel button
-- Afficher cover thumbnail
-
-#### 3. `SeriesForm` ✅ QUASI-COMPLET
-Déjà bien implémenté, juste tester
-
-#### 4. `DirectScrape` ✅ QUASI-COMPLET
-Déjà bien implémenté, juste tester
+1. **Localiser** le code original dans `src/BDbaseScraper.py`. Les numéros de ligne figurent dans les sections précédentes de ce guide.
+2. **Copier-coller** la portion ciblée dans le module correspondant (`scraper.py`, `ui_forms.py`).
+3. **Adapter** les imports : utiliser `config.*`, `utils.*`, `settings.*` au lieu des variables globales.
+4. **Réduire** la surface restante dans `BDbaseScraper.py` : ne garder que le hook + l’import du package refactoré.
+5. **Tester** localement : `python -m py_compile src/bdbase_scraper/scraper.py`, puis lancer le plugin dans ComicRack.
 
 ---
 
-## 🔄 Ordre d'Implémentation Recommandé
-
-### Étape 1: Core Parsing (Critique) ⚠️
-1. **parseAlbumInfo_bdbase()** - Le cœur du parsing
-2. **parseSerieInfo()** - Extraction info série
-3. **parseAlbumInfo()** - Wrapper simple
-
-**Temps estimé**: 2-3 heures
-**Fichiers touchés**: `scraper.py`
-
-### Étape 2: Entry Point 🔶
-4. **BD_start()** - Point d'entrée principal
-5. **AlbumChooser()** - Sélection albums
-
-**Temps estimé**: 1-2 heures
-**Fichiers touchés**: `scraper.py`
-
-### Étape 3: UI Finalization 🔷
-6. **BDConfigForm** - Compléter le dialogue config
-7. **ProgressBarDialog** - Compléter la progress bar
-
-**Temps estimé**: 2-3 heures
-**Fichiers touchés**: `ui_forms.py`
-
-### Étape 4: Integration & Tests 🧪
-8. Créer nouveau `BDbaseScraper.py` minimaliste
-9. Ajuster les chemins de fichiers
-10. Tests avec ComicRack
-
-**Temps estimé**: 2-3 heures
-
----
-
-## 💻 Méthode de Travail
-
-### Pour Chaque Fonction
-
-1. **Localiser** dans le fichier original (numéros de lignes donnés ci-dessus)
-2. **Copier** le code
-3. **Adapter** les imports:
-   ```python
-   # Avant (original)
-   if CBISBN:
-       book.ISBN = isbn
-
-   # Après (module)
-   import config
-   if config.CBISBN:
-       book.ISBN = isbn
-   ```
-4. **Remplacer** les appels de fonctions:
-   ```python
-   # Avant
-   titre = titlize(raw_title)
-
-   # Après
-   from utils import titlize
-   titre = titlize(raw_title)
-   ```
-5. **Tester** individuellement si possible
-
-### Variables Globales à Gérer
-
-Les variables globales du fichier original sont maintenant:
-- Dans **config.py**: CB*, SHOW*, VERSION, etc.
-- Dans **scraper.py**: dlgName, dlgNumber, bStopit, etc.
-
-**Migration**:
-```python
-# Original: variable globale directe
-global CBISBN
-if CBISBN:
-    ...
-
-# Nouveau: import depuis config
-import config
-if config.CBISBN:
-    ...
-```
-
----
-
-## 📝 Checklist d'Implémentation
+## 📝 Checklist d'implémentation (statuts mis à jour)
 
 ### scraper.py
-- [ ] parseAlbumInfo_bdbase() - Parsing album complet
-- [ ] parseSerieInfo() - Parsing série complet
-- [ ] parseAlbumInfo() - Wrapper
-- [ ] BD_start() - Entry point
-- [ ] AlbumChooser() - Sélection
-- [ ] parseRevueInfo() - Magazines
-- [ ] download_cover() - Couvertures
-- [ ] SetAlbumInformation() - Finalisation
-- [ ] search_series() - Recherche
-- [ ] Autres helpers
+- [x] `parseAlbumInfo_bdbase()` – parsing complet des métadonnées
+- [x] `parseSerieInfo()` – parsing série, albums et revues
+- [x] `parseAlbumInfo()` – wrapper avec `_read_url`
+- [ ] `BD_start()` – boucle principale (à écrire)
+- [x] `AlbumChooser()` – porté
+- [x] `parseRevueInfo()` – porté
+- [ ] `download_cover()` – besoin d’implémentation simple
+- [x] `SetAlbumInformation()` – porté
+- [ ] `search_series()` – placeholder pour l’instant
+- [ ] `find_best_match()` – placeholder
+- [ ] `normalize_album_number()` – placeholder
+- [ ] `extract_authors_from_html()` – placeholder
 
 ### ui_forms.py
-- [ ] BDConfigForm - Tous les onglets et contrôles
-- [ ] BDConfigForm.button_Click() - Sauvegarde complète
-- [ ] ProgressBarDialog - ProgressBar + Update()
-- [ ] Tester SeriesForm
-- [ ] Tester DirectScrape
+- [ ] `BDConfigForm` – il faut achever les onglets et `button_Click`
+- [ ] `ProgressBarDialog.Update()` – afficher progress bar et bouton cancel
+- [ ] `SeriesForm` – tester et lier au workflow `AlbumChooser`
+- [ ] `DirectScrape` – tester et connecter à `QuickScrapeBDbase`
 
-### Intégration
-- [ ] Nouveau BDbaseScraper.py (point d'entrée)
-- [ ] Ajuster chemins fichiers (get_plugin_path())
-- [ ] Corriger imports circulaires si besoin
-- [ ] Tests unitaires si possible
-- [ ] Test avec ComicRack
+### Intégration & tests
+- [ ] Refactorer `BDbaseScraper.py` (hooks + QuickScrape)
+- [ ] Adapter les chemins (icônes, `App.Config`) via `settings.get_plugin_path()`
+- [ ] Tester dans ComicRack (logs, couverture, options)
 
 ---
 
 ## 🎯 Objectif de la Phase 3
 
-**Résultat attendu**: Plugin ComicRack fonctionnel avec la nouvelle architecture
+**Résultat attendu** : plugin ComicRack totalement fonctionnel via les nouveaux modules.
 
-**Critères de succès**:
-- ✅ scraper.py implémenté et fonctionnel
-- ✅ ui_forms.py implémenté et fonctionnel
-- ✅ Nouveau BDbaseScraper.py créé
-- ✅ Plugin teste avec ComicRack sans erreurs
-- ✅ Toutes les fonctionnalités originales préservées
-
----
-
-## 🚀 Démarrage Rapide
-
-Pour commencer **maintenant**, voici la première tâche concrète:
-
-### TÂCHE 1: Implémenter parseAlbumInfo_bdbase()
-
-```bash
-# 1. Ouvrir le fichier original
-nano src/BDbaseScraper.py +1099
-
-# 2. Copier les lignes 1099-1568 (fonction parseAlbumInfo_bdbase)
-
-# 3. Ouvrir le module
-nano src/bdbase_scraper/scraper.py
-
-# 4. Remplacer la fonction placeholder par l'implémentation
-
-# 5. Adapter les imports et variables globales
-
-# 6. Tester l'import:
-python -c "from bdbase_scraper import scraper; print('OK')"
-```
+**Critères de succès** :
+- `scraper.py` peut traiter séries/albums (séries, volumes, revues, HS, etc.) sans faire référence aux anciens globals.
+- `ui_forms.py` expose les dialogues nécessaires et sauvegarde les options.
+- `BDbaseScraper.py` ne contient plus la logique monolithique, uniquement les hooks.
+- Les traductions et la configuration passent par `settings.py`.
+- Les tests (py_compile + ComicRack) passent sans erreurs.
 
 ---
 
-**Prêt à commencer** ? Suivez ce guide étape par étape pour une implémentation propre et testable.
+## 🚀 Démarrage rapide (tâche prioritaire)
 
-**Prochaine étape**: Implémenter `parseAlbumInfo_bdbase()` (fonction la plus critique)
+**Tâche 1: finaliser `BD_start()`**
+1. Ouvrir `src/bdbase_scraper/scraper.py` et prolonger la fonction `BD_start()` avec : chargement settings, boucle `for book in books`, rappel `SetSerieInformation`, capture des erreurs.
+2. Ajouter `QuickScrapeBDbase()` qui importe `scraper` et appelle `BD_start()` (optionnellement en mode direct).
+3. Vérifier les logs via `debuglog` et `log_BD`.
+
+**Tâche 2: harmoniser `settings` + `ui_forms`**
+1. Relier `BDConfigForm` à `settings.LoadSetting()`/`SaveSetting()`.
+2. S’assurer que `SeriesForm` prépare `NewLink`/`NewSeries`.
+3. Brancher `ProgressBarDialog` sur les appels de `BD_start()` pour afficher la progression.
+
+---
+
+**Besoin d’un coup de main ?**
+- Utiliser `rg` pour retrouver les anciens blocs de code.
+- Copier-coller les regex de `config.py` si nécessaire.
+- Tester fréquemment : `python -m py_compile src/bdbase_scraper/*.py` et ouvrir ComicRack pour valider.

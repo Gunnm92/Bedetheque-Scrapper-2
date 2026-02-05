@@ -5,146 +5,76 @@
 ```
 bdbasescraper/
 │
-├── 📄 REFACTORING_PLAN.md          Plan détaillé du refactoring
-├── 📄 STRUCTURE.md                 Ce fichier - Vue d'ensemble de la structure
+├── 📄 REFACTORING_PLAN.md          Plan du refactoring
+├── 📄 STRUCTURE.md                 Ce fichier (vue d'ensemble)
+├── 📄 PROGRESS.md                  Suivi de progression
+├── 📄 IMPLEMENTATION_GUIDE.md      Guide de phase 3
+├── 📄 FINAL_SUMMARY.md             Résumé final (en cours)
 │
-├── 📂 release/                     Build du plugin pour ComicRack
+├── 📂 release/                     Build du plugin
 │   └── BDbase Scraper_v1.00.crplugin
 │
-└── 📂 src/                         Code source
-    │
-    ├── 📄 README.md                Documentation de la structure src/
-    ├── 📄 BDbaseScraper.py         ⚠️  Fichier monolithique original (3524 lignes)
+└── 📂 src/
+    ├── 📄 README.md                Documentation source
+    ├── 📄 BDbaseScraper.py         Point d'entrée original (à refactorer)
     ├── 📄 BDTranslations.Config    Traductions FR/EN
-    ├── 📄 Package.ini              Configuration du package ComicRack
+    ├── 📄 Package.ini              Configuration ComicRack
     │
-    ├── 📂 bdbase_scraper/          ✨ Modules refactorés du plugin
-    │   ├── __init__.py             Package initialization
-    │   ├── config.py               Constantes, regex, feature flags
-    │   └── utils.py                Fonctions utilitaires
+    ├── 📂 bdbase_scraper/          ✨ Package refactoré
+    │   ├── __init__.py             Initialisation
+    │   ├── config.py               Constantes / patterns ✅
+    │   ├── utils.py                Helpers ✅
+    │   ├── settings.py             Config + traductions ✅
+    │   ├── scraper.py              Parsing + sélection ⚠️ (entry point en cours)
+    │   └── ui_forms.py             Dialogues ⚠️ (events à brancher)
     │
-    ├── 📂 stdlib/                  Bibliothèque standard Python 2.7
-    │   ├── collections.py          (29 fichiers au total)
-    │   ├── urllib.py
-    │   ├── HTMLParser.py
-    │   └── ...
-    │
-    └── 📂 assets/                  Ressources graphiques
-        ├── BDbase.png              Icône principale
-        ├── BDbaseQ.png             Icône QuickScrape
-        ├── BDbase.ico              Icône Windows
-        └── *.svg                   Sources vectorielles
+    ├── 📂 stdlib/                  Python 2.7 stdlib (29 fichiers)
+    └── 📂 assets/                  Ressources graphiques (6 fichiers)
 ```
 
-## 📊 Statistiques
+## 🧭 Statuts des modules
 
-### Avant refactoring
-```
-src/
-├── BDbaseScraper.py (3524 lignes) ← Tout le code dans un seul fichier
-├── 29 fichiers stdlib
-├── 6 fichiers assets
-└── 2 fichiers config
-```
-
-### Après refactoring (en cours)
-```
-src/
-├── bdbase_scraper/
-│   ├── config.py (200 lignes)     ✅ FAIT
-│   ├── utils.py (400 lignes)      ✅ FAIT
-│   ├── settings.py (~300 lignes)  ⏳ À FAIRE
-│   ├── scraper.py (~1500 lignes)  ⏳ À FAIRE
-│   └── ui_forms.py (~1100 lignes) ⏳ À FAIRE
-│
-├── BDbaseScraper.py (~100 lignes) ⏳ Point d'entrée (à refactorer)
-├── stdlib/ (29 fichiers)          ✅ Organisés
-└── assets/ (6 fichiers)            ✅ Organisés
-```
-
-## 🎯 Modules du package bdbase_scraper/
-
-| Module | Taille | Status | Description |
-|--------|--------|--------|-------------|
-| `__init__.py` | 12 lignes | ✅ | Initialisation du package |
-| `config.py` | ~200 lignes | ✅ | Constantes, patterns regex, feature flags |
-| `utils.py` | ~400 lignes | ✅ | Parsing, HTTP, formatage, logging |
-| `settings.py` | ~300 lignes | ⏳ | Gestion configuration XML, traductions |
-| `scraper.py` | ~1500 lignes | ⏳ | Logique de scraping principale |
-| `ui_forms.py` | ~1100 lignes | ⏳ | Formulaires et dialogues UI |
-
-**Total**: ~3512 lignes (vs 3524 lignes originales)
-
-## 🔄 Progression du Refactoring
-
-### Phase 1: Infrastructure ✅
-- [x] Créer branche `refactoring/split-main-file`
-- [x] Extraire `config.py`
-- [x] Extraire `utils.py`
-- [x] Organiser structure de dossiers
-- [x] Documentation (README, PLAN, STRUCTURE)
-
-### Phase 2: Modules métier ⏳
-- [ ] Créer `settings.py` (gestion config + traductions)
-- [ ] Créer `scraper.py` (logique de scraping)
-- [ ] Créer `ui_forms.py` (formulaires UI)
-
-### Phase 3: Intégration ⏳
-- [ ] Refactorer `BDbaseScraper.py` comme point d'entrée
-- [ ] Ajuster les chemins de fichiers
-- [ ] Tester avec ComicRack
-
-### Phase 4: Finalisation ⏳
-- [ ] Tests complets
-- [ ] Mise à jour documentation
-- [ ] Merge vers main
-
-## 💡 Avantages de la nouvelle structure
-
-### Avant (1 fichier monolithique)
-```python
-# BDbaseScraper.py - 3524 lignes 😱
-# - Constants
-# - Utils
-# - Settings
-# - Scraping logic
-# - UI forms
-# - Everything mixed together
-```
-
-### Après (modules séparés)
-```python
-# Imports clairs et logiques
-from bdbase_scraper import config, utils, settings, scraper
-from bdbase_scraper.ui_forms import BDConfigForm, ProgressBarDialog
-
-# Code organisé et maintenable ✨
-```
-
-### Bénéfices
-- ✅ **Lisibilité** : Fichiers plus courts (~200-400 lignes)
-- ✅ **Maintenabilité** : Séparation claire des responsabilités
-- ✅ **Testabilité** : Possibilité de tester chaque module
-- ✅ **Réutilisabilité** : Fonctions utilitaires isolées
-- ✅ **Navigation** : Structure logique facile à parcourir
-- ✅ **Collaboration** : Moins de conflits git
-
-## 📝 Notes importantes
-
-1. **Compatibilité préservée** : Le fichier original reste intact
-2. **Pas de régression** : Le plugin continue de fonctionner normalement
-3. **Migration progressive** : Refactoring fait étape par étape
-4. **Tests continus** : Validation à chaque étape
-
-## 🚀 Prochaine étape
-
-Créer le module `settings.py` avec :
-- Classe `AppSettings` (gestion XML)
-- Fonctions `LoadSetting()` / `SaveSetting()`
-- Système de traductions `Translate()` / `Trans()`
+| Module | Status | Notes |
+|--------|--------|-------|
+| `config.py` | ✅ | Constantes et flags migrés. |
+| `utils.py` | ✅ | Helpers complet pour texte / http / logging. |
+| `settings.py` | ✅ | Gestion App.Config + traductions. |
+| `scraper.py` | ⚠️ | Parsing/albums/revues portés ; `BD_start`, `QuickScrape` et helpers manquent. |
+| `ui_forms.py` | ⚠️ | Dialogues créés, ils doivent encore être liés aux événements et à `settings`. |
+| `BDbaseScraper.py` | ⚠️ | Ancienne logique monolithique – doit devenir un orchestrateur minimal. |
 
 ---
 
-**Créé le** : 2026-02-05
-**Branche** : refactoring/split-main-file
-**Status** : Phase 1 complète ✅
+## 🔄 Progression du refactoring
+
+### Phase 1: Infrastructure
+- ✅ Branches / dossiers créés
+- ✅ `config.py`, `utils.py`, `settings.py`
+- ✅ Documentation (plan, structure, guide)
+
+### Phase 2: Modules métier
+- ✅ `scraper.py` structure (parsing, albums, revues)
+- ⚠️ `BD_start`, `QuickScrape`, helpers encore à écrire
+- ⚠️ `ui_forms.py` - événements et liaison à finaliser
+
+### Phase 3: Intégration & tests (en cours)
+- Actions restantes : réécrire `BDbaseScraper.py`, exposer les hooks, brancher l’UI, tester dans ComicRack.
+
+---
+
+## 🎯 Avantages de la nouvelle structure
+- ✅ **Lisibilité** : chaque rôle a son module
+- ✅ **Maintenance** : plus facile d’ajouter de nouvelles traductions ou patterns
+- ✅ **Tests** : `scraper.py` peut être compilé/testé indépendamment
+- ✅ **Documentation** : guide, plan, progrès, summary alignés
+
+---
+
+## 📝 Notes importantes
+1. **Variables globales** comme `dlgNumber` sont désormais limitées à `scraper.py`.
+2. **Accès aux ressources** doit passer par `settings.get_plugin_path()` (utile pour `App.Config`, icônes, translations).
+3. **Compatibilité ComicRack** : conserver les décorateurs `@Hook` et l’import `cYo.Projects.ComicRack.Engine` dans `BDbaseScraper.py` (lors de la réécriture finale).
+
+---
+
+**Date de mise à jour**: 2026-02-05 23:58
