@@ -5,14 +5,25 @@ Contains all the scraping logic for retrieving BD metadata from bdbase.fr
 """
 from __future__ import unicode_literals
 import re
-from datetime import datetime
-from System.Windows.Forms import MessageBox, MessageBoxButtons, MessageBoxIcon, MessageBoxDefaultButton, DialogResult
+from datetime import datetime, timedelta
+from time import perf_counter as clock
+from urllib import quote
+from System.Windows.Forms import (
+    MessageBox, MessageBoxButtons, MessageBoxIcon, MessageBoxDefaultButton,
+    DialogResult, Application
+)
+from System.IO import FileInfo, File
+from System.Diagnostics.Process import Start
+from System.Threading import Thread, ThreadStart
+from System.Net import HttpWebRequest, Cookie, DecompressionMethods
+from System import Math
 # Import from our modules
 import config
 from config import *
 from utils import *
-from settings import Trans
-from ui_forms import SeriesForm, FormType
+import settings
+from settings import LoadSetting, Trans, Translate
+from ui_forms import ProgressBarDialog, SeriesForm, FormType
 # Import ComicRack if available
 try:
     from cYo.Projects.ComicRack.Engine import ComicRack
@@ -52,29 +63,252 @@ Numero = ""
 # ========================================
 
 def BD_start(books):
-    """
-    Main entry point for the BDbase scraper
-    Args:
-        books: ComicRack book collection to scrape
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    global bStopit, nRenamed, nIgnored
-    # TODO: Implement full BD_start logic from original file (lines 207-640)
-    # This is the main scraping workflow:
-    # 1. Load settings
-    # 2. Show progress dialog
-    # 3. For each book:
-    #    - Extract book info (series, number)
-    #    - Search on bdbase.fr
-    #    - Let user choose if multiple results
-    #    - Parse serie info
-    #    - Parse album info
-    #    - Update book metadata
-    # 4. Show final statistics
-    debuglog("BD_start called with books count:", books.Count if books else 0)
-    # Placeholder return
-    return False
+
+    global nRenamed, nIgnored
+
+    settings.aWord = Translate()
+
+    if not LoadSetting():
+        return
+
+    bdlogfile = ""
+    debuglogfile = ""
+
+    if not books:
+        Result = MessageBox.Show(ComicRack.MainWindow, Trans(1),Trans(2), MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
+        return
+
+    bdlogfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
+    if FileInfo(bdlogfile).Exists and FileInfo(bdlogfile).Length > RENLOGMAX:
+        Result = MessageBox.Show(ComicRack.MainWindow, Trans(3), Trans(4), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+        if Result == DialogResult.Yes:
+            File.Delete(bdlogfile)
+
+    debuglogfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
+    if FileInfo(debuglogfile).Exists and FileInfo(debuglogfile).Length > DBGLOGMAX:
+        Result = MessageBox.Show(ComicRack.MainWindow, Trans(5), Trans(6), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+        if Result == DialogResult.Yes:
+            File.Delete(debuglogfile)
+
+    nRenamed = 0
+    nIgnored = 0
+    
+    if CBRescrape:
+        Result = MessageBox.Show(ComicRack.MainWindow, Trans(139), Trans(138), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+        if Result == DialogResult.No:
+            return
+
+    if books:
+        WorkerThread(books)
+
+    else:
+        if DBGONOFF:
+            print(Trans(15) + "\n")
+        log_BD(Trans(15), "", 1)
+
+def WorkerThread(books):
+
+    global AlbumNumNum, dlgNumber, dlgName, dlgNameClean, nRenamed, nIgnored, dlgAltNumber, bError
+    global PickSeries, serie_rech_prev, Shadow1, Shadow2, log_messages
+
+    t = Thread(ThreadStart(thread_proc))
+
+    bError = False
+    log_messages = []
+
+    Shadow1 = False
+    Shadow2 = False
+
+    TimeStart = clock()
+
+    try:
+
+        f = ProgressBarDialog(books.Count)
+        f.Show(ComicRack.MainWindow)
+
+        serieUrl = None
+        nOrigBooks = books.Count
+
+        log_BD(Trans(7) + str(nOrigBooks) +  Trans(8), "\n============ " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + " ===========", 0)
+
+        i = 0
+
+        debuglog(chr(10) + "=" * 25 + "- Begin! -" + "=" * 25 + chr(10))
+
+        nTIMEDOUT = 0
+        
+        nBooks = len(books)
+        PickSeries = False
+        serie_rech_prev = None
+
+        for book in books:
+
+            TimeBookStart = clock()
+            debuglog("v" * 60)
+
+            if bStopit or (nTIMEDOUT == int(TIMEOUT)):
+                if bStopit: debuglog("Cancelled from WorkerThread Start")
+                return
+
+            nTIMEDOUT += 1
+
+            if book.Number:
+                dlgNumber = book.Number
+            else:
+                dlgNumber = book.ShadowNumber
+                Shadow2 = True
+
+            if book.Series:
+                dlgName = titlize(book.Series)
+            else:
+                dlgName = book.ShadowSeries
+                Shadow1 = True
+
+            if book.AlternateNumber:
+                dlgAltNumber = book.AlternateNumber
+            else:
+                dlgAltNumber = ""
+
+            dlgNameClean = cleanARTICLES(dlgName)
+            dlgName = formatARTICLES(dlgName)
+
+            findCara = dlgName.find(SUBPATT)
+            if findCara > 0 :
+                lenDlgName = len(dlgName)
+                totalchar = lenDlgName - findCara
+                dlgName = dlgName[:-totalchar]
+
+            mPos = re.search(r'([.,\\/])', dlgNumber)
+            if not isnumeric(dlgNumber):
+                albumNum = dlgNumber
+                AlbumNumNum = False
+            elif isnumeric(dlgNumber) and not re.search(r'[.,\\/]', dlgNumber):
+                dlgNumber = str(int(dlgNumber))
+                albumNum = str(int(dlgNumber))
+                AlbumNumNum = True
+            elif mPos:
+                nPos = mPos.start(1)
+                albumNum = dlgNumber[:nPos]
+                dlgAltNumber = dlgNumber[nPos:]
+                dlgNumber = albumNum
+                AlbumNumNum = True
+
+            f.Update("[" + str(i + 1) + "/" + str(len(books)) + "] : " + dlgName + " - " + dlgNumber + if_else(dlgAltNumber == '', '', ' AltNo.[' + dlgAltNumber + ']') + " - " + titlize(book.Title), 1, book)
+            f.Refresh()
+            Application.DoEvents()
+
+            if bStopit:
+                debuglog("Cancelled from WorkerThread after Update")
+                return
+
+            RetAlb = False
+            if CBRescrape:
+                if book.Web:
+                    RetAlb = QuickScrapeBDbase(books, book, book.Web)
+
+            if not CBRescrape:
+                debuglog(Trans(9) + dlgName + "\tNo = [" + albumNum + "]" + if_else(dlgAltNumber == '', '', '\tAltNo. = [' + dlgAltNumber + ']'))
+                serieUrl = None
+                debuglog(Trans(10), dlgName)
+                
+                RetAlb = False
+                serieUrl = GetFullURL(SetSerieId(book, dlgName, albumNum, nBooks))
+
+                if bStopit:
+                    debuglog("Cancelled from WorkerThread after SetSerieId return")
+                    return
+
+                if serieUrl:
+                    RetAlb = True
+                    if not '/revue-' in serieUrl: 
+                        LongSerie= serieUrl.lower().replace(".html", u'__10000.html')
+                        serieUrl = LongSerie
+                        
+                    if AlbumNumNum:
+                        debuglog(Trans(11), albumNum + "]", if_else(dlgAltNumber == '', '', ' - AltNo.: ' + dlgAltNumber))
+                    else:
+                        debuglog(Trans(12) + albumNum + "]", if_else(dlgAltNumber == '', '', ' - AltNo. [' + dlgAltNumber + ']'))
+
+                    RetAlb = SetAlbumInformation(book, serieUrl, dlgName, albumNum)
+
+                    #SkipAlbum utlisez lorsque l'on appuye sur Annuler (ou AllowUserChoice == 0) dans la fenetre pour choisir l'album ParseSerieInfo
+                    if not SkipAlbum and not RetAlb and not '/revue-' in serieUrl:
+                        # Only parse when the URL looks like an album page, to avoid mapping series pages
+                        if is_probable_album_url(serieUrl):
+                            RetAlb = parseAlbumInfo(book, serieUrl, albumNum)
+            
+            if RetAlb:
+                nRenamed += 1
+                log_BD("[" + dlgName + "] " + dlgNumber + if_else(dlgAltNumber == '', '', ' AltNo.[' + dlgAltNumber + ']') + " - " + titlize(book.Title), Trans(13), 1)
+            else:
+                nIgnored += 1
+                log_BD("[" + dlgName + "] " + dlgNumber + if_else(dlgAltNumber == '', '', ' AltNo. [' + dlgAltNumber + ']') + " - " + titlize(book.Title), Trans(14) + "\n", 1)
+
+            i += 1
+
+            TimeBookEnd = clock()
+            nSec = int(TimeBookEnd - TimeBookStart)
+            debuglog(Trans(125), str(timedelta(seconds=nSec)) + chr(10))
+            debuglog("^" * 60)
+
+            # timeout in seconds before next scrape
+            if TIMEOUTS and nOrigBooks > nIgnored + nRenamed:
+                cPause = Trans(140).replace("%%", str(TIMEOUTS))
+                f.Update(cPause, 0, False)
+                f.Refresh()
+                for ii in range(20*int(TIMEOUTS)):
+                    t.CurrentThread.Join(50)
+                    Application.DoEvents()
+                    if bStopit:
+                        debuglog("Cancelled from WorkerThread TIMEOUT Loop")
+                        return
+            if bStopit:
+                debuglog("Cancelled from WorkerThread End")
+                return
+
+    except:
+        cError = debuglogOnError()
+        log_BD("   [" + dlgName + "] " + dlgNumber + " - " + titlize(book.Title), cError, 1)
+        if f:
+            f.Close()
+            t.Abort()
+        return
+
+    finally:
+        f.Update(Trans(16), 1, book)
+        f.Refresh()
+        #Application.DoEvents()
+        f.Close()
+
+        log_BD("\n" + Trans(17) + str(nRenamed) , "", 0)
+        log_BD(Trans(18) + str(nIgnored), "", 0)
+        log_BD("============= " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + " =============", "\n\n", 0)
+
+        TimeEnd = clock()
+        nSec = int(TimeEnd - TimeStart)
+        debuglog(Trans(124), str(timedelta(seconds=nSec)) )
+        debuglog("=" * 25 + "- End! -" + "=" * 25 + chr(10))
+        flush_debuglog()
+
+        if bError and SHOWDBGLOG:
+            rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + ", " + Trans(18) + str(nIgnored) + ", (" + Trans(108) + str(nOrigBooks) + ")\n\n" + Trans(19), Trans(20), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
+            if rdlg == DialogResult.Yes:
+                # open debug log automatically
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
+        elif SHOWRENLOG:
+            rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + ", " + Trans(18) + str(nIgnored) + ", (" + Trans(108) + str(nOrigBooks) + ")\n\n" + Trans(21), Trans(22), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+            if rdlg == DialogResult.Yes:
+                # open rename log automatically
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
+        else:
+
+            rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + ", " + Trans(18) + str(nIgnored) + " (" + Trans(108) + str(nOrigBooks) + ")" , Trans(22), MessageBoxButtons.OK, MessageBoxIcon.Exclamation, MessageBoxDefaultButton.Button1)            
+
+        t.Abort()
+
+        return
 
 # ========================================
 # Serie Information Functions
@@ -290,17 +524,105 @@ def parseSerieInfo(book, serieUrl, lDirect=False):
     return albumURL
 
 def SetSerieId(book, serie, num, nBooksIn):
-    """
-    Set series ID and related information
-    Args:
-        book: ComicRack book object
-        serie: Series name
-        num: Album number
-        nBooksIn: Number of books in series
-    """
-    # TODO: Implement SetSerieId logic from original file
-    # Sets SeriesGroup, ShadowSeries, Count, etc.
-    pass
+
+    global ListSeries, NewLink, NewSeries, RenameSeries, PickSeries, PickSeriesLink, serie_rech_prev
+    
+    if not serie:
+        return ""
+
+    RenameSeries = False
+
+    try:
+        serie_rech = remove_accents(serie.lower())
+        if serie_rech == serie_rech_prev and PickSeries != False:
+            serie_rech_prev = serie_rech
+            RenameSeries = PickSeries
+            return PickSeriesLink
+        else:
+            serie_rech_prev = serie_rech
+            PickSeries = False
+
+        ListSeries = list()
+        debuglog("Nom de Série pour recherche = " + dlgNameClean)
+        query = quote(remove_accents(dlgNameClean.lower().strip()).encode('utf-8'))
+        urlN = '/recherche-series?type=bd&sch=' + query
+
+        debuglog(Trans(113), BASE_DOMAIN + urlN)
+
+        request = _read_url(urlN.encode('utf-8'), False)
+
+        if bStopit:
+            debuglog("Cancelled from SetSerieId after Search return")
+            return ''
+
+        if not request:
+            return ''
+
+        i = 1
+        RegCompile = re.compile(SERIE_LIST_PATTERN, re.IGNORECASE | re.DOTALL)
+        for seriepick in RegCompile.finditer(request):
+            ListSeries.append([seriepick.group(1), checkWebChar(strip_tags(seriepick.group(2))), str(i).zfill(3)])
+            i = i + 1
+
+        ListSeries.sort(key=operator.itemgetter(2))
+
+        if len(ListSeries) == 1 and not AlwaysChooseSerie:
+            debuglog(Trans(24) + checkWebChar(serie) + "]" )
+            debuglog(Trans(111) + (ListSeries[0][1]))
+            log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[0][0] + ")", Trans(25), 1)
+            log_BD(Trans(111), "[" + ListSeries[0][1] + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[0][0] + ")", 1)
+            RenameSeries = ListSeries[0][1]
+            return ListSeries[0][0]
+
+        elif len(ListSeries) > 1 or (AlwaysChooseSerie and len(ListSeries) >= 1) :
+            if AllowUserChoice or nBooksIn == 1:
+                lUnique = False
+                for i in range(len(ListSeries)):
+                    if remove_accents(ListSeries[i][1].lower()) == remove_accents(dlgName.lower().strip()):
+                        lUnique = True
+                        nItem = i
+                    if remove_accents(ListSeries[i][1].lower()) == remove_accents(dlgName.lower().strip()) and re.search(r'\(.{4,}?\)', ListSeries[i][1].lower()):
+                        lUnique = False
+                    if AlwaysChooseSerie:
+                        lUnique = False
+                if lUnique:
+                    debuglog(Trans(24) + checkWebChar(serie) + "]" )
+                    debuglog(Trans(111) + (ListSeries[nItem][1]))
+                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[nItem][0] + ")", Trans(25), 1)
+                    log_BD(Trans(111), "[" + ListSeries[nItem][1] + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[nItem][0] + ")", 1)
+                    RenameSeries = ListSeries[nItem][1]
+                    return ListSeries[nItem][0]
+                # Pick a series
+                NewLink = ''
+                NewSeries = ''
+                a = ListSeries
+                pickAseries = SeriesForm(serie, ListSeries, FormType.SERIE)
+                result = pickAseries.ShowDialog()
+
+                if result == DialogResult.Cancel:
+                    debuglog(Trans(24) + checkWebChar(serie) + "]")
+                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ")", Trans(25), 1)
+                    return ''
+                else:
+                    debuglog(Trans(24) + checkWebChar(serie) + "]")
+                    debuglog(Trans(111) + (NewSeries))
+                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ")", Trans(25), 1)
+                    log_BD(Trans(111), "[" + NewSeries + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + NewLink + ")", 1)
+                    RenameSeries = NewSeries
+                    PickSeries = RenameSeries
+                    PickSeriesLink = NewLink
+                    return NewLink
+            else:
+                debuglog(Trans(142) + checkWebChar(serie) + "]")
+                log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ")", Trans(25), 1)
+                return ''
+
+    except:
+
+        cError = debuglogOnError()
+        log_BD("** Error [" + serie + "] " + num + " - " + titlize(book.Title), cError, 1)
+
+    return serieUrl
 
 # ========================================
 # Album Information Functions
@@ -892,17 +1214,165 @@ def is_oneshot(album_data):
 
 # ========================================
 
-def QuickScrapeBDbase(books, book="", cLink=False):
-    """
-    Quick scrape entry point (called by ComicRack hook)
-    This function is kept in the original BDbaseScraper.py for now
-    as it's directly linked to the ComicRack hooks.
-    Will be migrated in final integration phase.
-    """
-    # NOTE: This function stays in BDbaseScraper.py for now
-    # It will import and call functions from this module
-    pass
+def QuickScrapeBDbase(books, book = "", cLink = False):
 
+    global LinkBDbase, Numero, AlbumNumNum, dlgNumber, dlgName, nRenamed, nIgnored, dlgAltNumber, Shadow1, Shadow2, RenameSeries
+
+    RetAlb = False
+
+    if not cLink:
+        if not LoadSetting():
+            return False
+
+    RenameSeries = False
+
+    if not books:
+        Result = MessageBox.Show(ComicRack.MainWindow, Trans(1),Trans(2), MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
+        return False
+
+    LinkBDbase = ""
+
+    if not cLink:
+        nRenamed = 0
+        nIgnored = 0
+    cError = False
+    MyBooks = []
+    f = None
+    success = True
+
+    try:
+
+        if books:
+            if cLink:
+                MyBooks.append(book)
+            else:
+                MyBooks = books
+                f = ProgressBarDialog(books.Count)
+                if books.Count > 1:
+                    f.Show(ComicRack.MainWindow)
+
+            log_BD(Trans(7) + str(MyBooks.Count) +  Trans(8), "\n============ " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + " ===========", 0)
+
+            for MyBook in MyBooks:
+
+                if cLink:
+                    Numero = ""
+                    serieUrl = cLink
+                    LinkBDbase = serieUrl
+
+                else:
+
+                    if MyBook.Number:
+                        dlgNumber = MyBook.Number
+                        Shadow2 = False
+                    else:
+                        dlgNumber = MyBook.ShadowNumber
+                        Shadow2 = True
+
+                    if MyBook.Series:
+                        dlgName = titlize(MyBook.Series)
+                        Shadow1 = False
+                    else:
+                        dlgName = MyBook.ShadowSeries
+                        Shadow1 = True
+
+                    dlgAltNumber = ""
+                    if MyBook.AlternateNumber:
+                        dlgAltNumber = MyBook.AlternateNumber
+
+                    albumNum = dlgNumber
+                    mPos = re.search(r'([.,\\/-])', dlgNumber)
+
+                    if not isnumeric(dlgNumber):
+                        albumNum = dlgNumber
+                        AlbumNumNum = False
+                    elif isnumeric(dlgNumber) and not re.search(r'[.,\\/-]', dlgNumber):
+                        dlgNumber = str(int(dlgNumber))
+                        albumNum = str(int(dlgNumber))
+                        AlbumNumNum = True
+                    elif mPos:
+                        nPos = mPos.start(1)
+                        albumNum = dlgNumber[:nPos]
+                        dlgAltNumber = dlgNumber[nPos:]
+                        dlgNumber = albumNum
+                        AlbumNumNum = True
+
+                    f.Update(dlgName + if_else(dlgNumber != "", " - " + dlgNumber, " ") + if_else(dlgAltNumber == '', '', ' AltNo.[' + dlgAltNumber + ']') + " - " + titlize(MyBook.Title), 1, MyBook)
+                    f.Refresh()
+
+                    scrape = DirectScrape()
+                    result = scrape.ShowDialog()
+
+                    if result == DialogResult.Cancel or (LinkBDbase == ""):
+                        success = False
+                        break
+
+                    if LinkBDbase:
+                        serieUrl = GetFullURL(LinkBDbase)
+
+                if LinkBDbase:
+                    debuglog(Trans(104), LinkBDbase)
+
+                RetVal = serieUrl
+                if "/serie-" in serieUrl or '/revue-' in serieUrl: 
+                    serieUrl = serieUrl if "__10000.html" in serieUrl or '/revue-' in serieUrl else serieUrl.lower().replace(".html", u'__10000.html')                   
+                    RetVal = parseSerieInfo(MyBook, serieUrl, True)
+
+                if RetVal and not '/revue-' in serieUrl:
+                    if LinkBDbase:
+                        RetVal = parseAlbumInfo(MyBook, RetVal, dlgNumber, True)
+
+                if RetVal:
+                    if not cLink:
+                        nRenamed += 1
+                    log_BD("[" + serieUrl + "]", Trans(13), 1)
+                else:
+                    if not cLink:
+                        nIgnored += 1
+                    log_BD("[" + serieUrl + "]", Trans(14) + "\n", 1)
+
+        else:
+            success = False
+            debuglog(Trans(15) +"\n")
+            log_BD(Trans(15), "", 1)
+
+    except:
+        cError = debuglogOnError()
+        success = False
+        try:
+            log_BD("   [" + serieUrl + "]", cError, 1)
+        except:
+            log_BD("   [error]", cError, 1)
+
+    finally:
+        if not cLink and f:
+            f.Update(Trans(16), 1, book)
+            f.Refresh()
+            f.Close()
+        if not success:
+            return False
+
+    # Bilan final dans les logs
+    log_BD("\n" + Trans(17) + str(nRenamed) , "", 0)
+    log_BD(Trans(18) + str(nIgnored), "", 0)
+    log_BD("============= " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + " =============", "\n\n", 0)
+
+    # Popups de bilan (uniquement en mode interactif, pas en rescrape via cLink)
+    if not cLink:
+        if cError and SHOWDBGLOG:
+            rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + "," + Trans(18) + str(nIgnored) + "\n\n" + Trans(19), Trans(20), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
+            if rdlg == DialogResult.Yes:
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
+        elif SHOWRENLOG:
+            rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + "," + Trans(18) + str(nIgnored) + "\n\n" + Trans(21), Trans(22), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+            if rdlg == DialogResult.Yes:
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
+        else:
+            rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + "," + Trans(18) + str(nIgnored) , Trans(22), MessageBoxButtons.OK, MessageBoxIcon.Exclamation, MessageBoxDefaultButton.Button1)
+
+    return True
 # ========================================
 # Progress and UI Helper Functions
 
@@ -950,3 +1420,11 @@ __all__ = [
     'search_series',
     'QuickScrapeBDbase'
 ]
+
+
+def thread_proc():
+
+    pass
+
+    def handle(w, a): 
+        pass
