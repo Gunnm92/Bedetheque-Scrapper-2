@@ -19,7 +19,11 @@
 from __future__ import unicode_literals
 
 import clr, sys, re, os, System
-import operator, collections, json
+import operator, collections
+try:
+    import json
+except:
+    json = None
 from datetime import datetime, timedelta
 from time import strftime
 try:
@@ -595,6 +599,8 @@ def parse_date_fr(raw_text):
 def extract_ld_json(html):
     if not html:
         return None
+    if not json:
+        return None
     try:
         m = re.search(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', html, re.IGNORECASE | re.DOTALL)
         if not m:
@@ -608,6 +614,8 @@ def extract_number_from_title(raw_text):
     if not raw_text:
         return ""
     text = normalize_text(raw_text)
+    if re.search(r'\bhors[-\s]?serie\b', text) or re.search(r'\bhs\b', text):
+        return "HS"
     if re.search(r'\d+\s*(?:a|à|-)\s*\d+', text):
         return ""
     m = re.search(r'(?:tome|vol|volume|t)\s*([0-9]+)', text)
@@ -624,6 +632,14 @@ def extract_number_from_title(raw_text):
     if m and m.group(1) in word_map:
         return word_map[m.group(1)]
     return ""
+
+def is_hors_serie_text(raw_text):
+    if not raw_text:
+        return False
+    text = normalize_text(raw_text)
+    if re.search(r'\bhors[-\s]?serie\b', text) or re.search(r'\bhs\b', text):
+        return True
+    return False
 
 def SetAlbumInformation(book, serieUrl, serie, num):
 
@@ -845,6 +861,10 @@ def parseSerieInfo(book, serieUrl, lDirect):
                 num = extract_number_from_title(title_main)
                 if not num and title_sub:
                     num = extract_number_from_title(title_sub)
+                if not num and url:
+                    mnum = re.search(r'-([0-9]{1,3})(?:|-)', url)
+                    if mnum:
+                        num = mnum.group(1)
                 label = title_main + if_else(title_sub, " - " + title_sub, "")
                 ListAlbumAll.append([url, label, str(i).zfill(3), num, title_main, title_sub])
                 i = i + 1
@@ -1104,6 +1124,8 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
             title_main = raw_title_main
             if serie_name and normalize_text(title_main).startswith(normalize_text(serie_name)):
                 title_main = title_main[len(serie_name):].strip(" :-–")
+        hs_flag = is_hors_serie_text(raw_title_main) or is_hors_serie_text(title_main) or is_hors_serie_text(pageUrl)
+        if not hs_flag:
             # Drop leading volume markers to keep the true title
             title_main = re.sub(r'^(?:tome|vol(?:ume)?|t\.?|v\.?|int[ée]grale|coffret|hors[\s-]?s[ée]rie)\s*(?:[0-9]+|[ivxlcdm]+)?(?:\s*(?:a|à|au|&|et|\-|–|—)\s*(?:[0-9]+|[ivxlcdm]+))?\s*[:\-–—]?\s*', '', title_main, flags=re.IGNORECASE).strip()
 
@@ -1120,8 +1142,12 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
         if m_og:
             og_title = checkWebChar(strip_tags(m_og.group(1))).strip()
         num_from_title = extract_number_from_title(raw_title_main or og_title or title_main or book.Title)
-        book.Number = num if num else num_from_title
-        book.AlternateNumber = dlgAltNumber if dlgAltNumber else book.AlternateNumber
+        if hs_flag:
+            book.Number = "HS"
+            book.AlternateNumber = ""
+        else:
+            book.Number = num if num else num_from_title
+            book.AlternateNumber = dlgAltNumber if dlgAltNumber else book.AlternateNumber
         debuglog("Num: ", book.Number)
         debuglog("Alt: ", book.AlternateNumber)
 
@@ -1241,10 +1267,10 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
 
         illustrations = details.get("illustrations") or details.get("illustations")
         if CBColorist and illustrations:
-            if "couleur" in normalize_text(illustrations):
-                book.BlackAndWhite = YesNo.No
-            elif "noir" in normalize_text(illustrations):
+            if 'n&b' in normalize_text(illustrations):
                 book.BlackAndWhite = YesNo.Yes
+            else:
+                book.BlackAndWhite = YesNo.No
 
         # Authors
         role_map = {
