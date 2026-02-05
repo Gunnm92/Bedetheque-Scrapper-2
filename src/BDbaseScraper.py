@@ -19,7 +19,7 @@
 from __future__ import unicode_literals
 
 import clr, sys, re, os, System
-import operator, collections
+import operator, collections, json
 from datetime import datetime, timedelta
 from time import strftime
 try:
@@ -54,7 +54,7 @@ BasicXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><configuration></configura
 
 CookieContainer = System.Net.CookieContainer()
 
-VERSION = "6.04"
+VERSION = "1.00"
 
 SHOWRENLOG = False
 SHOWDBGLOG = False
@@ -370,8 +370,9 @@ def WorkerThread(books):
 
                     #SkipAlbum utlisez lorsque l'on appuye sur Annuler (ou AllowUserChoice == 0) dans la fenetre pour choisir l'album ParseSerieInfo
                     if not SkipAlbum and not RetAlb and not '/revue-' in serieUrl:
-                        # reading info on album when no album list is present (i.e. "Croisade (Seconde époque: Nomade)")
-                        RetAlb = parseAlbumInfo (book, serieUrl, albumNum)
+                        # Only parse when the URL looks like an album page, to avoid mapping series pages
+                        if is_probable_album_url(serieUrl):
+                            RetAlb = parseAlbumInfo(book, serieUrl, albumNum)
             
             if RetAlb:
                 nRenamed += 1
@@ -589,6 +590,19 @@ def parse_date_fr(raw_text):
     month = month_map.get(m.group(2), None)
     year = int(m.group(3)) if m.group(3) else None
     return month, year
+
+
+def extract_ld_json(html):
+    if not html:
+        return None
+    try:
+        m = re.search(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', html, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return None
+        data = m.group(1).strip()
+        return json.loads(data)
+    except:
+        return None
 
 def extract_number_from_title(raw_text):
     if not raw_text:
@@ -1077,12 +1091,21 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
                 debuglog(Trans(9), book.Series)
 
         # Title
+        raw_title_main = ""
         title_main = ""
         m_title = re.search(ALBUM_TITLE_PATTERN, albumHTML, re.IGNORECASE | re.DOTALL)
         if m_title:
-            title_main = checkWebChar(strip_tags(m_title.group(1))).strip()
+            raw_title_main = checkWebChar(strip_tags(m_title.group(1))).strip()
+
+        m_title_sub = re.search(r'<span\s+class="title">([^<]+)</span>', albumHTML, re.IGNORECASE | re.DOTALL)
+        if m_title_sub:
+            title_main = checkWebChar(strip_tags(m_title_sub.group(1))).strip()
+        else:
+            title_main = raw_title_main
             if serie_name and normalize_text(title_main).startswith(normalize_text(serie_name)):
                 title_main = title_main[len(serie_name):].strip(" :-–")
+            # Drop leading volume markers to keep the true title
+            title_main = re.sub(r'^(?:tome|vol(?:ume)?|t\.?|v\.?|int[ée]grale|coffret|hors[\s-]?s[ée]rie)\s*(?:[0-9]+|[ivxlcdm]+)?(?:\s*(?:a|à|au|&|et|\-|–|—)\s*(?:[0-9]+|[ivxlcdm]+))?\s*[:\-–—]?\s*', '', title_main, flags=re.IGNORECASE).strip()
 
         if CBTitle and title_main:
             if book.Series and title_main.lower() == book.Series.lower():
@@ -1092,7 +1115,11 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
             debuglog(Trans(29), book.Title)
 
         # Numbers
-        num_from_title = extract_number_from_title(title_main or book.Title)
+        og_title = ""
+        m_og = re.search(r'property="og:title"\s+content="([^"]+)"', albumHTML, re.IGNORECASE)
+        if m_og:
+            og_title = checkWebChar(strip_tags(m_og.group(1))).strip()
+        num_from_title = extract_number_from_title(raw_title_main or og_title or title_main or book.Title)
         book.Number = num if num else num_from_title
         book.AlternateNumber = dlgAltNumber if dlgAltNumber else book.AlternateNumber
         debuglog("Num: ", book.Number)
@@ -1140,6 +1167,10 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
             val = checkWebChar(strip_tags(d.group(2))).strip()
             if key:
                 details[key] = val
+        # Fallback: use details for publisher when available
+        if CBEditor and not book.Publisher and details.get("editeur"):
+            book.Publisher = details.get("editeur")
+            debuglog(Trans(35), book.Publisher)
 
         if CBPrinted and details.get("date de parution"):
             month, year = parse_date_fr(details.get("date de parution"))
@@ -1154,6 +1185,43 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
         if CBISBN and details.get("isbn"):
             book.ISBN = details.get("isbn")
             debuglog("ISBN: ", book.ISBN)
+
+        # LD+JSON fallback for missing details
+        ld = extract_ld_json(albumHTML)
+        if isinstance(ld, list):
+            # find first WebPage with mainEntity
+            for item in ld:
+                if isinstance(item, dict) and item.get('@type') == 'WebPage' and item.get('mainEntity'):
+                    ld = item
+                    break
+        book_data = None
+        if isinstance(ld, dict):
+            book_data = ld.get('mainEntity') if ld.get('@type') == 'WebPage' else ld
+        if isinstance(book_data, dict):
+            if CBPrinted and (book.Year == -1 or not book.Year):
+                dp = book_data.get('datePublished')
+                if dp and isinstance(dp, str) and '-' in dp:
+                    parts = dp.split('-')
+                    if len(parts) >= 2:
+                        try:
+                            book.Year = int(parts[0])
+                            book.Month = int(parts[1])
+                        except:
+                            pass
+            if CBCount and (not book.PageCount or book.PageCount == 0):
+                pages = book_data.get('numberOfPages')
+                if pages and str(pages).isdigit():
+                    book.PageCount = int(pages)
+            if CBEditor and not book.Publisher:
+                pub = book_data.get('publisher')
+                if isinstance(pub, dict):
+                    pub = pub.get('name')
+                if pub:
+                    book.Publisher = checkWebChar(strip_tags(str(pub))).strip()
+            if CBISBN and not book.ISBN:
+                isbn = book_data.get('isbn') or book_data.get('isbn13')
+                if isbn:
+                    book.ISBN = checkWebChar(strip_tags(str(isbn))).strip()
 
         if CBFormat:
             fmt_parts = []
@@ -1442,6 +1510,19 @@ def isPositiveInt(value):
         return int(value) >= 0
     except:
         return False
+
+
+def is_probable_album_url(url):
+    if not url:
+        return False
+    url_l = url.lower()
+    # Album URLs often contain a numeric part (e.g. -1-, -12-)
+    if re.search(r'/bd/[^/]*-\d{1,3}(?:\b|-)\S*', url_l):
+        return True
+    # Some albums don't have a number but include a tome/volume keyword
+    if re.search(r'/bd/[^/]*(tome|volume|vol|integrale|coffret|hors[-\s]?serie|hs)[^/]*', url_l):
+        return True
+    return False
 
 def url_fix(s, charset='utf-8'):
 
