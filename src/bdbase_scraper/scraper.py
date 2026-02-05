@@ -17,6 +17,7 @@ from System.Diagnostics.Process import Start
 from System.Threading import Thread, ThreadStart
 from System.Net import HttpWebRequest, Cookie, DecompressionMethods
 from System import Math
+from System.Drawing import Image
 # Import from our modules
 import config
 from config import *
@@ -825,24 +826,7 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
             else:
                 book.BlackAndWhite = YesNo.No
         # Authors
-        role_map = {
-            "scenario": "Writer",
-            "storyboard": "Writer",
-            "dessin": "Penciller",
-            "couleurs": "Colorist",
-            "colorisation": "Colorist",
-            "encrage": "Inker",
-            "couverture": "CoverArtist",
-            "lettrage": "Letterer"
-        }
-        authors = {"Writer": [], "Penciller": [], "Colorist": [], "Inker": [], "CoverArtist": [], "Letterer": []}
-        for a in BDBASE_ALBUM_AUTHOR.finditer(albumHTML):
-            name = checkWebChar(strip_tags(a.group(1))).strip()
-            role = normalize_text(a.group(2))
-            if role in role_map and name:
-                key = role_map[role]
-                if name not in authors[key]:
-                    authors[key].append(name)
+        authors = extract_authors_from_html(albumHTML)
         if CBWriter and authors["Writer"]:
             book.Writer = ", ".join(authors["Writer"])
             debuglog(Trans(30), book.Writer)
@@ -868,20 +852,7 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
         if CBCover and not book.FilePath and not BDBASE_DISABLE_COVER:
             coverMatch = re.search(r'<meta\s+property="og:image"\s+content="([^"]+)"', albumHTML, re.IGNORECASE)
             if coverMatch:
-                CoverImg = coverMatch.group(1)
-                try:
-                    coverReq = HttpWebRequest.Create(CoverImg)
-                    coverReq.UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    coverResp = coverReq.GetResponse()
-                    coverStream = coverResp.GetResponseStream()
-                    retval = Image.FromStream(coverStream)
-                    ComicRack.App.SetCustomBookThumbnail(book, retval)
-                    debuglog(Trans(105), CoverImg)
-                except:
-                    debuglog("Cover download failed for: " + CoverImg)
-                finally:
-                    if coverStream: coverStream.Close()
-                    if coverResp: coverResp.Close()
+                download_cover(book, coverMatch.group(1))
         if CBNotes:
             write_book_notes(book)
     except:
@@ -1123,20 +1094,117 @@ def download_cover(book, cover_url):
 
 def search_series(series_name):
     """
-    Search for a series on bdbase.fr
-    Args:
-        series_name: Name of the series to search
-    Returns:
-        list: List of (url, title, year) tuples
+    Search BDbase for a series and return (url, title) tuples.
     """
-    # TODO: Implement series search logic
-    # 1. Construct search URL
-    # 2. Download search results page
-    # 3. Parse results using SERIE_LIST regex
-    # 4. Return list of matches
-    debuglog("Searching for series:", series_name)
-    # Placeholder
-    return []
+    if not series_name:
+        return []
+
+    query = quote(remove_accents(series_name.lower().strip()).encode('utf-8'))
+    urlN = '/recherche-series?type=bd&sch=' + query
+    debuglog("Searching BDbase for series:", series_name)
+
+    results = []
+    html = _read_url(urlN.encode('utf-8'), False)
+    if not html:
+        return results
+
+
+
+def find_best_match(series_name, search_results):
+    if not search_results:
+        return None
+
+    target = normalize_text(series_name)
+    for url, title in search_results:
+        if normalize_text(title) == target:
+            return (url, title)
+    return search_results[0]
+
+
+def extract_authors_from_html(html):
+    role_map = {
+        "scenario": "Writer",
+        "storyboard": "Writer",
+        "dessin": "Penciller",
+        "couleurs": "Colorist",
+        "colorisation": "Colorist",
+        "encrage": "Inker",
+        "couverture": "CoverArtist",
+        "lettrage": "Letterer"
+    }
+    authors = {
+        "Writer": [],
+        "Penciller": [],
+        "Colorist": [],
+        "Inker": [],
+        "CoverArtist": [],
+        "Letterer": []
+    }
+    for match in BDBASE_ALBUM_AUTHOR.finditer(html):
+        name = checkWebChar(strip_tags(match.group(1))).strip()
+        role = normalize_text(match.group(2))
+        if role in role_map and name:
+            key = role_map[role]
+            if name not in authors[key]:
+                authors[key].append(name)
+    return authors
+
+
+def normalize_album_number(raw_number):
+    if not raw_number:
+        return ("", "")
+    main = raw_number
+    alt = ""
+    mPos = re.search(r'([.,\/-])', raw_number)
+    if mPos:
+        nPos = mPos.start(1)
+        main = raw_number[:nPos]
+        alt = raw_number[nPos:]
+    else:
+        if isnumeric(raw_number):
+            main = str(int(raw_number))
+        else:
+            main = raw_number
+    return (main, alt)
+
+
+def is_oneshot(album_data):
+    if not album_data:
+        return False
+    fmt = (album_data.get("format") or "").lower()
+    if "one shot" in fmt:
+        return True
+    if album_data.get("number", "").upper() == "HS":
+        return True
+    return False
+
+
+def download_cover(book, cover_url):
+    if not cover_url or config.BDBASE_DISABLE_COVER or book.FilePath:
+        return False
+    try:
+        coverReq = HttpWebRequest.Create(cover_url)
+        coverReq.UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        coverResp = coverReq.GetResponse()
+        coverStream = coverResp.GetResponseStream()
+        retval = Image.FromStream(coverStream)
+        ComicRack.App.SetCustomBookThumbnail(book, retval)
+        debuglog(Trans(105), cover_url)
+        return True
+    except:
+        debuglog("Cover download failed for: " + cover_url)
+        return False
+    finally:
+        if 'coverStream' in locals() and coverStream:
+            coverStream.Close()
+        if 'coverResp' in locals() and coverResp:
+            coverResp.Close()
+    for match in re.finditer(SERIE_LIST_PATTERN, html, re.IGNORECASE | re.DOTALL):
+        series_url = match.group(1)
+        title = checkWebChar(strip_tags(match.group(2))).strip()
+        results.append((series_url, title))
+
+    return results
 
 def find_best_match(series_name, search_results):
     """
@@ -1418,6 +1486,10 @@ __all__ = [
     'parseRevueInfo',
     'download_cover',
     'search_series',
+    'find_best_match',
+    'normalize_album_number',
+    'is_oneshot',
+    'extract_authors_from_html',
     'QuickScrapeBDbase'
 ]
 

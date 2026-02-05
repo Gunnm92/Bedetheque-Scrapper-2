@@ -19,7 +19,7 @@ Refactorer le monolithe `BDbaseScraper.py` en modules clairs (`config`, `utils`,
 ---
 
 ## ⚠️ Modules en cours
-- **scraper.py** – `parseSerieInfo`, `parseAlbumInfo`, `parseAlbumInfo_bdbase`, `AlbumChooser`, `parseRevueInfo`, `SetAlbumInformation` importés. `BD_start()`, `QuickScrapeBDbase()` et les helpers (`search_series`, `normalize_album_number`, `download_cover`, `extract_authors_from_html`) restent à terminer.
+- **scraper.py** – parsing + workflows portés (parseSerieInfo, parseAlbumInfo*, parseRevueInfo, AlbumChooser, SetAlbumInformation). `BD_start()`/`QuickScrapeBDbase()` fonctionnent dans le module et les helpers (`search_series`, `find_best_match`, `normalize_album_number`, `download_cover`, `extract_authors_from_html`) sont implémentés ; reste la liaison UI/entry.
 - **ui_forms.py** – Dialogues (`BDConfigForm`, `ProgressBarDialog`, `SeriesForm`, `DirectScrape`, `HighDpiHelper`) créés, mais les événements et la liaison avec `settings` ne sont pas branchés.
 - **BDbaseScraper.py** – Le fichier original est encore monolithique; il doit bientôt devenir le point d’entrée qui importe `bdbase_scraper` et expose les hooks.
 
@@ -36,18 +36,17 @@ Refactorer le monolithe `BDbaseScraper.py` en modules clairs (`config`, `utils`,
 ---
 
 ## 🧭 Rappel du workflow à venir
-1. Compléter `BD_start()` et `QuickScrapeBDbase()` pour déclencher le parsing (serie → album/revue).
-2. Finaliser `search_series`, `find_best_match`, `normalize_album_number`, `download_cover`, `extract_authors_from_html`.
-3. Lier `BDConfigForm` / `DirectScrape` aux `settings` (chargement / sauvegarde) et intégrer `SeriesForm`/`ProgressBarDialog`.
-4. Refactorer `BDbaseScraper.py` pour qu’il importe `scraper`/`settings`/`ui_forms` et expose les hooks ComicRack (`@Hook Books`, `@Hook ConfigScript`).
-5. Tester dans ComicRack (couverture, logs, dialogues, QuickScrape). 
+1. Connecter `BDConfigForm`, `SeriesForm` et `ProgressBarDialog` aux options `settings` afin que `scraper.BD_start()` puisse afficher les dialogues comme avant.
+2. Finaliser `BDbaseScraper.py` pour qu’il importe `bdbase_scraper` et expose les hooks ComicRack (Books, ConfigScript, QuickScrape).
+3. Tester le plugin dans ComicRack, vérifier les logs, les couvertures, les dialogues et le quick scrape.
+
 
 ---
 
 ## 🔁 Prochaine phase
-- **Phase 3 (Intégration)** : Écrire les points d’entrée (`BD_start`, `QuickScrape`), lier l’UI et valider le fonctionnement complet.
-- **Phase 4 (Tests)** : Tester avec ComicRack, vérifier les logs, couvertures, comportements d’annulation.
-- **Phase 5 (Finalisation)** : Ajuster la documentation finale et préparer le merge vers `main`.
+- **Phase 3 (Intégration)** : Connecter l’UI (`BDConfigForm`, `SeriesForm`, `ProgressBarDialog`), refaire `BDbaseScraper.py` et valider les hooks + quick scrape.
+- **Phase 4 (Tests)** : Tester dans ComicRack (logs, couvertures, options, QuickScrape).
+- **Phase 5 (Finalisation)** : Mise à jour doc finale et merge vers `main`.
 
 ---
 
