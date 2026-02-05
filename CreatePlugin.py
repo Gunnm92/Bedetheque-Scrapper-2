@@ -8,11 +8,9 @@ def zip_files(list_files, out_name):
             archive.write(filename, name)
         
 def read_file(path):
-    #absolute_path = os.path.dirname(__file__)
-    #full_path = os.path.join(absolute_path, path)
-    
-    out_path = path if os.path.isabs(path) else find_path(path)     
-    return open(out_path)
+    out_path = path if os.path.isabs(path) else find_path(path)
+    with open(out_path, 'r') as handle:
+        return handle.read().splitlines()
 
 def find_path(filename):
     dir = os.path.dirname(__file__)
