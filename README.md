@@ -1,9 +1,9 @@
 ### You should consider using [ComicRack Community Edition](https://github.com/maforget/ComicRackCE). And if you can please contribute to the project.
 
-# Bedetheque Scrapper 2 for ComicRack
-Script that scrapes data from Bedetheque.com for ComicRack.
+# BDbase Scraper for ComicRack
+Script that scrapes data from BDbase.fr for ComicRack.
 
-![Bedetheque Scrapper 2 v5 6 Demo](https://user-images.githubusercontent.com/11904426/115951797-b56dbf80-a4b0-11eb-821b-6e97ca2cfca1.gif)
+![BDbase Scraper v5 6 Demo](https://user-images.githubusercontent.com/11904426/115951797-b56dbf80-a4b0-11eb-821b-6e97ca2cfca1.gif)
 
 ----
 

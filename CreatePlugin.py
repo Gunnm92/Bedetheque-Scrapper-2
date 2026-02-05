@@ -73,7 +73,9 @@ def get_plugin_name():
     name = thedict["Name"]
     version = thedict["Version"]
     # dir = os.path.expanduser("~/Desktop")
-    dir = os.path.dirname(__file__)
+    dir = os.path.join(os.path.dirname(__file__), 'release')
+    if not os.path.isdir(dir):
+        os.makedirs(dir)
     out_name = os.path.join(dir, f"{name}_v{version}.crplugin")
     print(out_name)
     return out_name
@@ -81,4 +83,5 @@ def get_plugin_name():
 if __name__ == '__main__':
     name = get_plugin_name()
     files = get_package_files()
-    #zip_files(files, name)
+    zip_files(files, name)
+    print(f"Created plugin with {len(files)} files.")

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-#@Name Bedetheque Scraper 2
-#@Key Bedetheque2
+#@Name BDbase Scraper
+#@Key BDbaseScraper
 #@Hook    Books, Editor
-#@Image BD2.png
-#@Description Search on wwww.bedetheque.com informations about the selected eComics
+#@Image BDbase.png
+#@Description Search on www.bdbase.fr informations about the selected eComics
 #
-# Bedetheque Scraper 2 - Avril 2021- v 5.4 -> by kiwi13 & maforget
+# BDbase Scraper - Avril 2021- v 5.4 -> by kiwi13 & maforget
 #
 # Original work by Franck (c) - revised by Mizio66 (c)
 #
@@ -106,19 +106,23 @@ TimerExpired = False
 SkipAlbum = False
 log_messages = []
 
+BASE_DOMAIN = "www.bdbase.fr"
+BASE_URL = "https://www.bdbase.fr"
+BDBASE_DISABLE_COVER = True
+
 ########################################
 # Nombres auteurs
 LAST_FIRST_NAMES_PATTERN = r'(?P<name>[^,]*?), (?P<firstname>[^,]*?)$'
 LAST_FIRST_NAMES = re.compile(LAST_FIRST_NAMES_PATTERN)
 
 ########################################
-# Info Serie
-SERIE_LIST_PATTERN = r'<a\shref="https://www.bedetheque.com/serie-(.*?)">.*?libelle">(.*?)\r'
+# Info Serie (BDbase)
+SERIE_LIST_PATTERN = r'<a\s+href="(/bd/[^"]+)"[^>]*class="card-link"[^>]*>.*?<div\s+class="card-title">(.*?)</div>'
 
 SERIE_LIST_CHECK_PATTERN = r's.ries\strouv.{20,60}?La\srecherche.*?\srenvoie\splus\sde\s500\sdonn'
 SERIE_LIST_CHECK = re.compile(SERIE_LIST_CHECK_PATTERN, re.IGNORECASE | re.DOTALL)
 
-SERIE_URL_PATTERN = r'<a\shref="(.*?)">\r\n.{50,60}<span\sclass="libelle">%s\s*?</span>'
+SERIE_URL_PATTERN = r'<a\s+href="(/bd/[^"]+)"[^>]*class="card-link"[^>]*>.*?<div\s+class="card-title">%s\s*?</div>'
 
 ALBUM_ID_PATTERN = r'id="%s".*?album-%s(.*?)\.html'
 ALBUM_INFO_PATTERN = r'<meta\sname="description"\scontent="(.*?)"'
@@ -130,25 +134,25 @@ INFOS_ALBUMS = re.compile(INFOS_ALBUMS_PATTERN, re.IGNORECASE | re.DOTALL)
 SERIE_LANGUE_PATTERN = r'class="flag"/>(.*?)</span>'
 SERIE_LANGUE = re.compile(SERIE_LANGUE_PATTERN, re.IGNORECASE)
 
-SERIE_GENRE_PATTERN = r'<span\sclass="style">(.*?)<'
+SERIE_GENRE_PATTERN = r'<span\s+class="serie-genres">(.*?)</span>'
 SERIE_GENRE = re.compile(SERIE_GENRE_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_RESUME_PATTERN = r'<meta\sname="description"\scontent="(.*?)"\s/>'
+SERIE_RESUME_PATTERN = r'<div\s+class="serie-resume">(.+?)</div>'
 SERIE_RESUME = re.compile(SERIE_RESUME_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_STATUS_PATTERN = r'<h3>.*?<span><i\sclass="icon-info-sign"></i>(.*?)</span>'
+SERIE_STATUS_PATTERN = r'<span\s+class="serie-status[^"]*">(.*?)</span>'
 SERIE_STATUS = re.compile(SERIE_STATUS_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
 SERIE_NOTE_PATTERN = r'<p\sclass="static">Note:\s<strong>\s(?P<note>[^<]*?)</strong>'
 SERIE_NOTE = re.compile(SERIE_NOTE_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_COUNT_PATTERN = r'class="icon-book"></i>\s(\d+)'
+SERIE_COUNT_PATTERN = r'<div\s+class="group-info">\s*<span>(\d+)\s+albums</span>'
 SERIE_COUNT = re.compile(SERIE_COUNT_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_COUNT_REAL_PATTERN = r'liste-albums-side(.*?)WIDGET'
+SERIE_COUNT_REAL_PATTERN = r'<div\s+class="group-info">(.+?)</div>'
 SERIE_COUNT_REAL = re.compile(SERIE_COUNT_REAL_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_COUNTOF_PATTERN = r'<label>(.*?)<span'
+SERIE_COUNTOF_PATTERN = r'(\d+)\s+albums'
 SERIE_COUNTOF = re.compile(SERIE_COUNTOF_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
 SERIE_HEADER2_PATTERN = r'<h3(.+?)</p'
@@ -156,7 +160,7 @@ SERIE_HEADER2 = re.compile(SERIE_HEADER2_PATTERN, re.IGNORECASE | re.MULTILINE |
 
 # Info Serie for Quickscrape
 
-SERIE_QSERIE_PATTERN = r'<h1>\s*<a href="serie-[^\.]+\.html">([^"<>]+)</a>'
+SERIE_QSERIE_PATTERN = r'<h1>\s*([^<]+?)\s*</h1>'
 
 # Info Album from Album
 INFO_SERIENAMENUMBER_ALBUM_PATTERN = r'<span\sclass="type">S.*?rie\s:\s</span>\s?(.*?)<.*?id="%s">.*?<div\sclass="titre">(?:(.*?)<.*?numa">(.*?)</span>\.?\s?)?(.*?)<'
@@ -164,7 +168,7 @@ INFO_SERIENAMENUMBER_ALBUM_PATTERN = r'<span\sclass="type">S.*?rie\s:\s</span>\s
 ALBUM_BDTHEQUE_NOTNUM_PATTERN = r'tails">.*?<span\sclass="numa"></span>.*?<a name="(.*?)"'
 ALBUM_BDTHEQUE_NOTNUM = re.compile(ALBUM_BDTHEQUE_NOTNUM_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-ALBUM_TITLE_PATTERN = r'itemprop="url"\shref="%s"\stitle="(.*?)">'
+ALBUM_TITLE_PATTERN = r'<span\s+class="title-main">(.*?)</span>'
 
 ALBUM_EVAL_PATTERN = r'ratingValue">(.*?)<'
 ALBUM_EVAL = re.compile(ALBUM_EVAL_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
@@ -175,7 +179,7 @@ ALBUM_MULTI_AUTHOR_NAMES = re.compile(ALBUM_MULTI_AUTHOR_NAMES_PATTERN, re.IGNOR
 ALBUM_SCENAR_MULTI_AUTHOR_PATTERN = r'<label>sc.*?nario\s:</label>(.*?)<label>[^&]'
 ALBUM_SCENAR_MULTI_AUTHOR = re.compile(ALBUM_SCENAR_MULTI_AUTHOR_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-# Storyboard artists (i.e https://www.bedetheque.com/BD-Aio-Zitelli-Tome-1-Recits-de-guerre-14-18-215576.html)
+# Storyboard artists (i.e https://www.bdbase.fr/bd/lanfeust-de-troy-tome-1-l-ivoire-du-magohamoth)
 ALBUM_STORYBOARD_MULTI_AUTHOR_PATTERN = r'label>storyboard\s:</label>(.*?)<label>[^&]'
 ALBUM_STORYBOARD_MULTI_AUTHOR = re.compile(ALBUM_STORYBOARD_MULTI_AUTHOR_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
@@ -218,6 +222,28 @@ ALBUM_PLANCHES = re.compile(ALBUM_PLANCHES_PATTERN, re.IGNORECASE | re.MULTILINE
 ALBUM_COVER_PATTERN = r'<meta\sproperty="og:title".*?="https:(.*?)"'
 ALBUM_COVER = re.compile(ALBUM_COVER_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
+# BDbase patterns
+BDBASE_ALBUM_SERIE_PATTERN = r'<label>Série</label>\s*<div>\s*<a\s+href="(/bd/[^"]+)">(.*?)</a>'
+BDBASE_ALBUM_SERIE = re.compile(BDBASE_ALBUM_SERIE_PATTERN, re.IGNORECASE | re.DOTALL)
+
+BDBASE_ALBUM_PUBLISHER_PATTERN = r'<label>Éditeur</label>\s*<div>\s*(?:<a[^>]*>)?(.*?)(?:</a>)?\s*</div>'
+BDBASE_ALBUM_PUBLISHER = re.compile(BDBASE_ALBUM_PUBLISHER_PATTERN, re.IGNORECASE | re.DOTALL)
+
+BDBASE_ALBUM_COLLECTION_PATTERN = r'<label>Collection</label>\s*<div>\s*(?:<a[^>]*>)?(.*?)(?:</a>)?\s*</div>'
+BDBASE_ALBUM_COLLECTION = re.compile(BDBASE_ALBUM_COLLECTION_PATTERN, re.IGNORECASE | re.DOTALL)
+
+BDBASE_ALBUM_RESUME_PATTERN = r'<div\s+class="pre">(.*?)</div>'
+BDBASE_ALBUM_RESUME = re.compile(BDBASE_ALBUM_RESUME_PATTERN, re.IGNORECASE | re.DOTALL)
+
+BDBASE_ALBUM_DETAILS_ITEM_PATTERN = r'<li>\s*<label>([^<]+)</label>\s*<div>(.*?)</div>\s*</li>'
+BDBASE_ALBUM_DETAILS_ITEM = re.compile(BDBASE_ALBUM_DETAILS_ITEM_PATTERN, re.IGNORECASE | re.DOTALL)
+
+BDBASE_ALBUM_AUTHOR_PATTERN = r'<div\s+class="card-title">\s*<a\s+href="[^"]+"\s+class="card-link">(.*?)</a>\s*</div>\s*<div\s+class="card-text">(.*?)</div>'
+BDBASE_ALBUM_AUTHOR = re.compile(BDBASE_ALBUM_AUTHOR_PATTERN, re.IGNORECASE | re.DOTALL)
+
+BDBASE_ALBUM_LIST_PATTERN = r'<a\s+href="(/bd/[^"]+)"[^>]*class="card-link"[^>]*>\s*<div\s+class="card-title">(.*?)</div>(?:\s*<div\s+class="card-text">(.*?)</div>)?'
+BDBASE_ALBUM_LIST = re.compile(BDBASE_ALBUM_LIST_PATTERN, re.IGNORECASE | re.DOTALL)
+
 ALBUM_RESUME_PATTERN = r'<meta\sname="description"\scontent="(.*?)"'
 ALBUM_RESUME = re.compile(ALBUM_RESUME_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
@@ -235,8 +261,8 @@ ALBUM_SINGLEALBUM_URLALL = re.compile(ALBUM_SINGLEALBUM_URLALL_PATTERN, re.DOTAL
 
 ALBUM_SINGLEALBUM_URL_PATTERN = r'href="(.*?)"\stitle.*?">.*?%s<span\sclass="numa">%s<'
 
-ALBUMDETAILS_URL_PATTERN = r'https://www.bedetheque.com/album-%s-(.*?)"'
-ALBUMDETAILSSINGLE_URL_PATTERN = r'https://www.bedetheque.com/album-(.*?)"'
+ALBUMDETAILS_URL_PATTERN = r'https://www\.bdbase\.fr/bd/([^"]+)"'
+ALBUMDETAILSSINGLE_URL_PATTERN = r'https://www\.bdbase\.fr/bd/([^"]+)"'
 
 ALBUM_URL_PATTERN_NOTNUM = r'<div\sclass="album.*?href="(.*?)"'
 ALBUM_URL_NOTNUM = re.compile(ALBUM_URL_PATTERN_NOTNUM, re.MULTILINE | re.DOTALL | re.IGNORECASE)
@@ -247,7 +273,7 @@ ALBUM_QNUM = re.compile(ALBUM_QNUM_PATTERN, re.IGNORECASE)
 ALBUM_QTITLE_PATTERN = r'titre.*?%s<span.*?name">(.*?)<'
 ########################################
 # Info Revues
-REVUE_LIST_PATTERN = r'<a\shref="https://www.bedetheque.com/revue-(.*?)">.*?libelle">(.*?)\r'
+REVUE_LIST_PATTERN = r'<a\shref="https://www.bdbase.fr/revue-(.*?)">.*?libelle">(.*?)\r'
 
 REVUE_LIST_EXISTS_PATTERN = r'<h3>\d{1,3} revue\w?? trouvée\w??</h3>'
 REVUE_LIST_EXISTS = re.compile(REVUE_LIST_EXISTS_PATTERN, re.IGNORECASE | re.DOTALL)
@@ -288,13 +314,13 @@ def BD_start(books):
         Result = MessageBox.Show(ComicRack.MainWindow, Trans(1),Trans(2), MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
         return
 
-    bdlogfile = (__file__[:-len('BedethequeScraper2.py')] + "BD2_Rename_Log.txt")
+    bdlogfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
     if FileInfo(bdlogfile).Exists and FileInfo(bdlogfile).Length > RENLOGMAX:
         Result = MessageBox.Show(ComicRack.MainWindow, Trans(3), Trans(4), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
         if Result == DialogResult.Yes:
             File.Delete(bdlogfile)
 
-    debuglogfile = (__file__[:-len('BedethequeScraper2.py')] + "BD2_debug_log.txt")
+    debuglogfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
     if FileInfo(debuglogfile).Exists and FileInfo(debuglogfile).Length > DBGLOGMAX:
         Result = MessageBox.Show(ComicRack.MainWindow, Trans(5), Trans(6), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
         if Result == DialogResult.Yes:
@@ -413,7 +439,7 @@ def WorkerThread(books):
             RetAlb = False
             if CBRescrape:
                 if book.Web:
-                    RetAlb = QuickScrapeBD2(books, book, book.Web)
+                    RetAlb = QuickScrapeBDbase(books, book, book.Web)
 
             if not CBRescrape:
                 debuglog(Trans(9) + dlgName + "\tNo = [" + albumNum + "]" + if_else(dlgAltNumber == '', '', '\tAltNo. = [' + dlgAltNumber + ']'))
@@ -502,14 +528,14 @@ def WorkerThread(books):
             rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + ", " + Trans(18) + str(nIgnored) + ", (" + Trans(108) + str(nOrigBooks) + ")\n\n" + Trans(19), Trans(20), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
             if rdlg == DialogResult.Yes:
                 # open debug log automatically
-                if FileInfo(__file__[:-len('BedethequeScraper2.py')] + "BD2_Debug_Log.txt"):
-                    Start(__file__[:-len('BedethequeScraper2.py')] + "BD2_Debug_Log.txt")
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
         elif SHOWRENLOG:
             rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + ", " + Trans(18) + str(nIgnored) + ", (" + Trans(108) + str(nOrigBooks) + ")\n\n" + Trans(21), Trans(22), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
             if rdlg == DialogResult.Yes:
                 # open rename log automatically
-                if FileInfo(__file__[:-len('BedethequeScraper2.py')] + "BD2_Rename_Log.txt"):
-                    Start(__file__[:-len('BedethequeScraper2.py')] + "BD2_Rename_Log.txt")
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
         else:
 
             rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + ", " + Trans(18) + str(nIgnored) + " (" + Trans(108) + str(nOrigBooks) + ")" , Trans(22), MessageBoxButtons.OK, MessageBoxIcon.Exclamation, MessageBoxDefaultButton.Button1)            
@@ -522,42 +548,12 @@ def SetSerieId(book, serie, num, nBooksIn):
 
     global ListSeries, NewLink, NewSeries, RenameSeries, PickSeries, PickSeriesLink, serie_rech_prev
     
-    if serie:
-        if re.match("[a-z]", remove_accents(serie[0]).lower()):
-            letter = remove_accents(serie[0])
-        else:
-            letter = "0"
-    else:
+    if not serie:
         return ""
-
-    urlN = "/bandes_dessinees_" + letter + ".html"
 
     RenameSeries = False
 
     try:
-
-        serieUrl = ''
-
-        debuglog("AlwaysChooseSerie: " + str(AlwaysChooseSerie))
-        if not AlwaysChooseSerie:
-            request = _read_url(urlN.encode('utf-8'), False)
-
-            if bStopit:
-                debuglog("Cancelled from SetSerieId after letter page return")
-                return ''
-
-            if request:
-                RegCompile = re.compile(SERIE_URL_PATTERN % checkRegExp(serie.strip()),  re.IGNORECASE)
-                nameRegex = RegCompile.search(request)
-
-                if nameRegex:
-
-                    serieUrl = nameRegex.group(1)
-                    if not ".html" in serieUrl:serieUrl += ".html"
-
-                    debuglog(Trans(23) + serieUrl)
-                    return serieUrl
-
         serie_rech = remove_accents(serie.lower())
         if serie_rech == serie_rech_prev and PickSeries != False:
             serie_rech_prev = serie_rech
@@ -569,9 +565,10 @@ def SetSerieId(book, serie, num, nBooksIn):
 
         ListSeries = list()
         debuglog("Nom de Série pour recherche = " + dlgNameClean)
-        urlN = '/search/tout?RechTexte=' + remove_accents(dlgNameClean.lower().strip()) +'&RechWhere=0'
+        query = quote(remove_accents(dlgNameClean.lower().strip()).encode('utf-8'))
+        urlN = '/recherche-series?type=bd&sch=' + query
 
-        debuglog(Trans(113), 'www.bedetheque.com' + urlN)
+        debuglog(Trans(113), BASE_DOMAIN + urlN)
 
         request = _read_url(urlN.encode('utf-8'), False)
 
@@ -579,30 +576,22 @@ def SetSerieId(book, serie, num, nBooksIn):
             debuglog("Cancelled from SetSerieId after Search return")
             return ''
 
-        if SERIE_LIST_CHECK.search(request) or REVUE_LIST_CHECK.search(request):
-            Result = MessageBox.Show(ComicRack.MainWindow, Trans(114) + '[' + titlize(book.Series) + '] !', Trans(2), MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
-            debuglog(Trans(114) + '[' + titlize(book.Series) + '] !')
+        if not request:
             return ''
 
         i = 1
-        RegCompile = re.compile(SERIE_LIST_PATTERN, re.IGNORECASE | re.DOTALL )
-        for seriepick in RegCompile.finditer(request):                        
-            ListSeries.append(["serie-" + seriepick.group(1), checkWebChar(strip_tags(seriepick.group(2))), str(i).zfill(3)])
+        RegCompile = re.compile(SERIE_LIST_PATTERN, re.IGNORECASE | re.DOTALL)
+        for seriepick in RegCompile.finditer(request):
+            ListSeries.append([seriepick.group(1), checkWebChar(strip_tags(seriepick.group(2))), str(i).zfill(3)])
             i = i + 1
-
-        RegCompile = re.compile(REVUE_LIST_PATTERN, re.IGNORECASE | re.DOTALL )
-        if REVUE_LIST_EXISTS.search(request):
-            for seriepick in RegCompile.finditer(request):
-                ListSeries.append(["revue-" + seriepick.group(1), checkWebChar(strip_tags(seriepick.group(2))), str(i).zfill(3)])  
-                i = i + 1
 
         ListSeries.sort(key=operator.itemgetter(2))
 
         if len(ListSeries) == 1 and not AlwaysChooseSerie:
             debuglog(Trans(24) + checkWebChar(serie) + "]" )
             debuglog(Trans(111) + (ListSeries[0][1]))
-            log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com" + serieUrl + ")", Trans(25), 1)
-            log_BD(Trans(111), "[" + ListSeries[0][1] + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com\\" + ListSeries[0][0] + ")", 1)
+            log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[0][0] + ")", Trans(25), 1)
+            log_BD(Trans(111), "[" + ListSeries[0][1] + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[0][0] + ")", 1)
             RenameSeries = ListSeries[0][1]
             return ListSeries[0][0]
 
@@ -620,8 +609,8 @@ def SetSerieId(book, serie, num, nBooksIn):
                 if lUnique:
                     debuglog(Trans(24) + checkWebChar(serie) + "]" )
                     debuglog(Trans(111) + (ListSeries[nItem][1]))
-                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com" + serieUrl + ")", Trans(25), 1)
-                    log_BD(Trans(111), "[" + ListSeries[nItem][1] + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com\\" + ListSeries[nItem][0] + ")", 1)
+                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[nItem][0] + ")", Trans(25), 1)
+                    log_BD(Trans(111), "[" + ListSeries[nItem][1] + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ListSeries[nItem][0] + ")", 1)
                     RenameSeries = ListSeries[nItem][1]
                     return ListSeries[nItem][0]
                 # Pick a series
@@ -633,20 +622,20 @@ def SetSerieId(book, serie, num, nBooksIn):
 
                 if result == DialogResult.Cancel:
                     debuglog(Trans(24) + checkWebChar(serie) + "]")
-                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com" + serieUrl + ")", Trans(25), 1)
+                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ")", Trans(25), 1)
                     return ''
                 else:
                     debuglog(Trans(24) + checkWebChar(serie) + "]")
                     debuglog(Trans(111) + (NewSeries))
-                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com" + serieUrl + ")", Trans(25), 1)
-                    log_BD(Trans(111), "[" + NewSeries + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com\\" + NewLink + ")", 1)
+                    log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ")", Trans(25), 1)
+                    log_BD(Trans(111), "[" + NewSeries + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + NewLink + ")", 1)
                     RenameSeries = NewSeries
                     PickSeries = RenameSeries
                     PickSeriesLink = NewLink
                     return NewLink
             else:
                 debuglog(Trans(142) + checkWebChar(serie) + "]")
-                log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com" + serieUrl + ")", Trans(25), 1)
+                log_BD("** [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo. ' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + ")", Trans(25), 1)
                 return ''
 
     except:
@@ -658,15 +647,15 @@ def SetSerieId(book, serie, num, nBooksIn):
 
 def GetFullURL(url):
     if url:
-        if re.search("https://www.bedetheque.com/", url, re.IGNORECASE):
+        if re.search(r"https?://%s/" % BASE_DOMAIN, url, re.IGNORECASE):
             return url
         else:
-            return "https://www.bedetheque.com/" + url
+            return BASE_URL + "/" + url.lstrip("/")
     else:
         return ''
 
 def write_book_notes(book):
-    book.Notes = "Bedetheque.com - " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + chr(10) + "BD2 scraper v" + VERSION
+    book.Notes = "BDbase.fr - " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + chr(10) + "BDbase scraper v" + VERSION
 
 def remove_accents(raw_text):
     raw_text = re.sub(u"[àáâãäåÀÁÂÄÅÃ]", 'a', raw_text)
@@ -677,6 +666,48 @@ def remove_accents(raw_text):
     raw_text = re.sub(u"[ùúûüÚÙÛÜ]", 'u', raw_text)
     raw_text = re.sub(u"[œŒ]", 'oe', raw_text)
     return raw_text
+
+def normalize_text(raw_text):
+    if not raw_text:
+        return ""
+    return remove_accents(strip_tags(checkWebChar(raw_text))).lower().strip()
+
+def parse_date_fr(raw_text):
+    if not raw_text:
+        return None, None
+    text = normalize_text(raw_text)
+    m = re.search(r'(\d{1,2})\s+([a-z]+)\s+(\d{4})', text)
+    if not m:
+        return None, None
+    month_map = {
+        "janvier": 1, "fevrier": 2, "mars": 3, "avril": 4,
+        "mai": 5, "juin": 6, "juillet": 7, "aout": 8, "septembre": 9,
+        "octobre": 10, "novembre": 11, "decembre": 12
+    }
+    month = month_map.get(m.group(2), None)
+    year = int(m.group(3)) if m.group(3) else None
+    return month, year
+
+def extract_number_from_title(raw_text):
+    if not raw_text:
+        return ""
+    text = normalize_text(raw_text)
+    if re.search(r'\d+\s*(?:a|à|-)\s*\d+', text):
+        return ""
+    m = re.search(r'(?:tome|vol|volume|t)\s*([0-9]+)', text)
+    if m:
+        return m.group(1)
+    word_map = {
+        "un": "1", "premier": "1",
+        "deux": "2", "second": "2",
+        "trois": "3", "quatre": "4", "cinq": "5",
+        "six": "6", "sept": "7", "huit": "8", "neuf": "9", "dix": "10",
+        "onze": "11", "douze": "12"
+    }
+    m = re.search(r'(?:tome|vol|volume|t)\s*([a-z]+)', text)
+    if m and m.group(1) in word_map:
+        return word_map[m.group(1)]
+    return ""
 
 def SetAlbumInformation(book, serieUrl, serie, num):
 
@@ -698,7 +729,7 @@ def SetAlbumInformation(book, serieUrl, serie, num):
     else:
         debuglog(Trans(26), Trans(25))
         debuglog(Trans(27) + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo.' + dlgAltNumber) + "\n")
-        log_BD("   [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo.' + dlgAltNumber) + " - " + titlize(book.Title) + " (www.bedetheque.com" + serieUrl + ")", Trans(28), 1)
+        log_BD("   [" + serie + "] " + num + if_else(dlgAltNumber == '', '', ' AltNo.' + dlgAltNumber) + " - " + titlize(book.Title) + " (" + BASE_DOMAIN + serieUrl + ")", Trans(28), 1)
         return False
 
 def parseSerieInfo(book, serieUrl, lDirect):
@@ -738,7 +769,7 @@ def parseSerieInfo(book, serieUrl, lDirect):
         if not REVUE_LIST_ALL or len(REVUE_LIST_ALL) == 0:
             REVUE_LIST_ALL_ALT = re.findall(r'<a name="(.+?)">.+?class="titre".{1,100}?#(.+?)\..+?', request, re.IGNORECASE | re.DOTALL | re.MULTILINE)
             for revueNum in REVUE_LIST_ALL_ALT:
-                full_url = serieUrl + "#" + revueNum[0] if "www.bedetheque.com" in serieUrl.lower() else "https://www.bedetheque.com/" + serieUrl + "#" + revueNum[0]
+                full_url = serieUrl + "#" + revueNum[0] if BASE_DOMAIN in serieUrl.lower() else BASE_URL + "/" + serieUrl.lstrip("/") + "#" + revueNum[0]
                 ListAlbum.append([full_url, "Num: " + revueNum[1].strip(), str(i).zfill(5)])
                 i = i + 1
         else:
@@ -794,21 +825,20 @@ def parseSerieInfo(book, serieUrl, lDirect):
 
             #genre
             if CBGenre:
-                nameRegex = SERIE_GENRE.search(Entete)
-                if nameRegex:
-                    genre = checkWebChar(nameRegex.group(1).strip())
-                else:
-                    genre = ""
-                if genre != "":
-                    book.Genre = genre
+                genres = []
+                for gblock in SERIE_GENRE.findall(Entete):
+                    for g in re.findall(r'<a[^>]*>(.*?)</a>', gblock, re.IGNORECASE | re.DOTALL):
+                        gname = checkWebChar(strip_tags(g)).strip()
+                        if gname and gname not in genres:
+                            genres.append(gname)
+                if genres:
+                    book.Genre = ", ".join(genres)
                     # Flag Erotique/Érotique genre as PG
-                    if 'rotique' in genre.lower():
+                    if 'rotique' in book.Genre.lower():
                         book.AgeRating = "PG"
-                elif genre == "" and '/revue-' in serieUrl:
-                    book.Genre = "Revue"
                 debuglog(Trans(51), book.Genre)
 
-            #Resume
+            #Resume (series summary may be missing on BDbase)
             if CBSynopsys:
                 nameRegex = SERIE_RESUME.search(checkWebChar(Entete.replace("\r\n","")), 0)
                 if nameRegex:
@@ -816,7 +846,6 @@ def parseSerieInfo(book, serieUrl, lDirect):
                 else:
                     resume = ""
 
-                resume = re.sub(r'Tout sur la série.*?:\s?', "", resume, re.IGNORECASE)
                 Serie_Resume = (checkWebChar(resume)).strip()
                 cResume = if_else(resume, Trans(52), Trans(53))
                 debuglog(cResume)
@@ -826,20 +855,21 @@ def parseSerieInfo(book, serieUrl, lDirect):
                 SerieState = ""
                 nameRegex = SERIE_STATUS.search(Entete)
                 if nameRegex:
-                    fin = checkWebChar(nameRegex.group(1).strip())
+                    fin = checkWebChar(strip_tags(nameRegex.group(1)).strip())
                     log_BD(fin, Trans(25), 1)
                 else:
                     fin = ""
 
-                if ("finie" in fin) or (dlgNumber.lower() == "one shot"):
+                fin_norm = normalize_text(fin)
+                if ("complete" in fin_norm) or ("termine" in fin_norm) or (dlgNumber.lower() == "one shot"):
                     book.SeriesComplete = YesNo.Yes
                     SerieState = Trans(54)
-                elif ("one shot" in fin.lower()) and (dlgNumber.lower() != "one shot"):
+                elif ("one shot" in fin_norm) and (dlgNumber.lower() != "one shot"):
                     book.SeriesComplete = YesNo.Yes
                     if ONESHOTFORMAT and not CBFormat:
                         book.Format = "One Shot"
                     SerieState = Trans(54)
-                elif ("cours" in fin):
+                elif ("cours" in fin_norm):
                     book.SeriesComplete = YesNo.No
                     SerieState = Trans(55)
                 else:
@@ -849,93 +879,85 @@ def parseSerieInfo(book, serieUrl, lDirect):
                 debuglog(Trans(57) + SerieState + if_else(dlgNumber.lower() == "one shot", " (One Shot)", ""))
 
             # Language
-            if CBLanguage:
-                nameRegex = SERIE_LANGUE.search(Entete)
-                dLang = {"Fr": "fr", "Al": "de", "An": "en", "It":"it", "Es":"es", "Ne":"du", "Po":"pt", "Ja":"ja"}
-                if nameRegex:
-                    langue = nameRegex.group(1).strip()
-                    debuglog(Trans(36), langue[:2])
-                    book.LanguageISO = dLang[langue[:2]]
+            if CBLanguage and not book.LanguageISO:
+                book.LanguageISO = "fr"
 
             #Default Values
             if not CBDefault:
                 book.EnableProposed = YesNo.No
                 debuglog(Trans(136), "No")
 
-            SerieInfoRegex = SERIE_HEADER2.search(request)
-            if SerieInfoRegex:
-                Entete2 = SerieInfoRegex.group(1)
-    
-                #Notes-Rating
-                #if CBRating:
-                #    nameRegex = SERIE_NOTE.search(Entete)
-                #    if nameRegex:
-                #        note = nameRegex.group('note')
-                #    else:
-                #        note = "0.0"
-    
-                #    book.CommunityRating = float(note) / 2
-                #    debuglog(Trans(58) + str(float(note) / 2))
-                
-                # Number of...
-                if CBCount and not lDirect:
-
-                    count = 0
-                    cCountText = ""
-                    if COUNTFINIE and book.SeriesComplete == YesNo.No:
+            # Number of...
+            if CBCount and not lDirect:
+                count = 0
+                cCountText = ""
+                if COUNTFINIE and book.SeriesComplete == YesNo.No:
+                    book.Count = -1
+                    cCountText = "---"
+                elif not COUNTOF:
+                    nameRegex = SERIE_COUNT.search(Entete)
+                    if nameRegex and AlbumNumNum:
+                        count = checkWebChar(nameRegex.group(1))
+                        book.Count = int(count)
+                        cCountText = str(int(count))
+                    else:
                         book.Count = -1
                         cCountText = "---"
-                    elif not COUNTOF:
-                        nameRegex = SERIE_COUNT.search(Entete2)
-                        if nameRegex and AlbumNumNum:
-                            count = checkWebChar(nameRegex.group(1))
+                else:
+                    nameRegex = SERIE_COUNT_REAL.search(request)
+                    if nameRegex:
+                        for numof in SERIE_COUNTOF.finditer(nameRegex.group(1)):
+                            if isnumeric(numof.group(1)) and int(numof.group(1)) > count:
+                                count = int(numof.group(1))
+                        if count > 0 and AlbumNumNum:
                             book.Count = int(count)
                             cCountText = str(int(count))
-                        else:
+                        elif not AlbumNumNum:
                             book.Count = -1
-                            cCountText = "---"
                     else:
-                        nameRegex = SERIE_COUNT_REAL.search(request)
-                        if nameRegex:
-                            for numof in SERIE_COUNTOF.finditer(nameRegex.group(1)):
-                                if isnumeric(numof.group(1)) and int(numof.group(1)) > count:
-                                    count = int(numof.group(1))
-                            if count > 0 and AlbumNumNum:
-                                book.Count = int(count)
-                                cCountText = str(int(count))
-                            elif not AlbumNumNum:
-                                book.Count = -1
-                        else:
-                            book.Count = -1
-                            cCountText = "---"
+                        book.Count = -1
+                        cCountText = "---"
 
-                    debuglog(Trans(59) + if_else(dlgNumber.lower() == "one shot", "1", cCountText))
-
-            Regex = re.compile(r'<label>([^<]*?)<span\sclass=\"numa\">(.*?)</span.*?<a\shref=\"(.*?)".*?title=.+?\">(.+?)</', re.IGNORECASE | re.DOTALL)
+                debuglog(Trans(59) + if_else(dlgNumber.lower() == "one shot", "1", cCountText))
 
             i = 0
-            ListAlbum, ListAlbumAll = list(), list()
-            for r in Regex.finditer(request):
-                n, a, url, title = r.group(1), r.group(2), r.group(3), r.group(4)
-                num = if_else(n,n, if_else(a, a, ""))
-                ListAlbumAll.append([url, num + ". " + title, str(i).zfill(3)])
-                if dlgNumber != "" and (num == dlgNumber) and not lDirect:
-                    ListAlbum.append([url, num + ". " + title, str(i).zfill(3)])
+            ListAlbumAll = list()
+            for r in BDBASE_ALBUM_LIST.finditer(request):
+                url = r.group(1)
+                title_main = checkWebChar(strip_tags(r.group(2))).strip()
+                title_sub = checkWebChar(strip_tags(r.group(3))).strip() if r.group(3) else ""
+                num = extract_number_from_title(title_main)
+                if not num and title_sub:
+                    num = extract_number_from_title(title_sub)
+                label = title_main + if_else(title_sub, " - " + title_sub, "")
+                ListAlbumAll.append([url, label, str(i).zfill(3), num, title_main, title_sub])
                 i = i + 1
 
-            if len(ListAlbum) == 0: 
-                ListAlbum = ListAlbumAll
+            if len(ListAlbumAll) == 0:
+                return ""
 
-            albumURL = AlbumChooser(ListAlbum)
-            if not albumURL and not SkipAlbum:
-                #Rien trouvé il ce peux qu'il n'est pas de liste sur le coté, surement 1 seul item
-                Regex = re.compile(r'class="titre"\shref="(.+?)".+?<span class="numa">.*?</span>.+?', re.IGNORECASE | re.DOTALL)
-                r = Regex.search(request)
-                if r:
-                    albumURL = r.group(1)
-                    debuglog("---> Numéro n'existe pas dans la liste, choix du 1er item")
-                else:
-                    return ""
+            matched = None
+            if dlgNumber != "" and not lDirect:
+                num_norm = dlgNumber.lstrip("0")
+                for a in ListAlbumAll:
+                    if a[3] and a[3].lstrip("0") == num_norm:
+                        matched = a
+                        break
+
+            if not matched and book.Title:
+                t_norm = normalize_text(book.Title)
+                for a in ListAlbumAll:
+                    if normalize_text(a[4]) == t_norm or normalize_text(a[5]) == t_norm:
+                        matched = a
+                        break
+
+            if matched:
+                albumURL = matched[0]
+            else:
+                ListAlbum = [[a[0], a[1], a[2]] for a in ListAlbumAll]
+                albumURL = AlbumChooser(ListAlbum)
+                if not albumURL and not SkipAlbum and ListAlbumAll:
+                    albumURL = ListAlbumAll[0][0]
 
     return albumURL
 
@@ -1138,6 +1160,8 @@ def parseAlbumInfo(book, pageUrl, num, lDirect = False):
         return False
 
     albumHTML = _read_url(pageUrl, False)
+    if BASE_DOMAIN in pageUrl.lower() or 'class="book-details-container"' in albumHTML:
+        return parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML)
     info_album_regex = INFOS_ALBUMS.search(albumHTML)
     info_album = ''
     if info_album_regex:
@@ -1273,7 +1297,7 @@ def parseAlbumInfo(book, pageUrl, num, lDirect = False):
                 else:
                     cBelid = re.search(r'-(\d+).html', pageUrl)
                     if cBelid:
-                        book.Web = 'www.bedetheque.com/BD--' + cBelid.group(1) + '.html'
+                        book.Web = GetFullURL(pageUrl)
                         debuglog(Trans(123), book.Web)
 
             qnum = pickedVar.N#is equal to t always, but keep it in case of needed modification
@@ -1487,6 +1511,179 @@ def parseAlbumInfo(book, pageUrl, num, lDirect = False):
 
     return True
 
+def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
+
+    global Serie_Resume
+
+    try:
+        # Series
+        serie_name = ""
+        serie_match = BDBASE_ALBUM_SERIE.search(albumHTML)
+        if serie_match:
+            serie_name = checkWebChar(strip_tags(serie_match.group(2))).strip()
+            if CBSeries:
+                book.Series = titlize(serie_name)
+                debuglog(Trans(9), book.Series)
+
+        # Title
+        title_main = ""
+        m_title = re.search(ALBUM_TITLE_PATTERN, albumHTML, re.IGNORECASE | re.DOTALL)
+        if m_title:
+            title_main = checkWebChar(strip_tags(m_title.group(1))).strip()
+            if serie_name and normalize_text(title_main).startswith(normalize_text(serie_name)):
+                title_main = title_main[len(serie_name):].strip(" :-–")
+
+        if CBTitle and title_main:
+            if book.Series and title_main.lower() == book.Series.lower():
+                book.Title = ""
+            else:
+                book.Title = titlize(title_main)
+            debuglog(Trans(29), book.Title)
+
+        # Numbers
+        num_from_title = extract_number_from_title(title_main or book.Title)
+        book.Number = num if num else num_from_title
+        book.AlternateNumber = dlgAltNumber if dlgAltNumber else book.AlternateNumber
+        debuglog("Num: ", book.Number)
+        debuglog("Alt: ", book.AlternateNumber)
+
+        # Web
+        if CBWeb == True and not CBRescrape:
+            book.Web = GetFullURL(pageUrl)
+            debuglog(Trans(123), book.Web)
+
+        # Publisher
+        if CBEditor:
+            m_pub = BDBASE_ALBUM_PUBLISHER.search(albumHTML)
+            if m_pub:
+                book.Publisher = checkWebChar(strip_tags(m_pub.group(1))).strip()
+            else:
+                book.Publisher = ""
+            debuglog(Trans(35), book.Publisher)
+
+        # Collection
+        if CBImprint:
+            m_col = BDBASE_ALBUM_COLLECTION.search(albumHTML)
+            if m_col:
+                book.Imprint = checkWebChar(strip_tags(m_col.group(1))).strip()
+            else:
+                book.Imprint = ""
+            debuglog(Trans(41), book.Imprint)
+
+        # Summary
+        if CBSynopsys:
+            m_resume = BDBASE_ALBUM_RESUME.search(albumHTML)
+            if m_resume:
+                resume = strip_tags(m_resume.group(1)).strip()
+                summary = if_else(book.Title, '>' + book.Title + '< ' + chr(10), "") + resume
+                if summary:
+                    book.Summary = summary
+                    debuglog(Trans(100))
+            else:
+                debuglog(Trans(101))
+
+        # Details
+        details = {}
+        for d in BDBASE_ALBUM_DETAILS_ITEM.finditer(albumHTML):
+            key = normalize_text(d.group(1))
+            val = checkWebChar(strip_tags(d.group(2))).strip()
+            if key:
+                details[key] = val
+
+        if CBPrinted and details.get("date de parution"):
+            month, year = parse_date_fr(details.get("date de parution"))
+            if month and year:
+                book.Month = int(month)
+                book.Year = int(year)
+                debuglog(Trans(34), str(book.Month) + "/" + str(book.Year))
+            else:
+                book.Month = -1
+                book.Year = -1
+
+        if CBISBN and details.get("isbn"):
+            book.ISBN = details.get("isbn")
+            debuglog("ISBN: ", book.ISBN)
+
+        if CBFormat:
+            fmt_parts = []
+            if details.get("couverture"):
+                fmt_parts.append(details.get("couverture"))
+            if details.get("dimensions"):
+                fmt_parts.append(details.get("dimensions"))
+            book.Format = " - ".join(fmt_parts) if fmt_parts else ""
+            debuglog(Trans(42), book.Format)
+
+        if details.get("pages") and not book.FilePath:
+            if details.get("pages").isdigit():
+                book.PageCount = int(details.get("pages"))
+            else:
+                book.PageCount = 0
+            debuglog(Trans(122), book.PageCount)
+
+        illustrations = details.get("illustations") or details.get("illustrations")
+        if CBColorist and illustrations:
+            if "couleur" in normalize_text(illustrations):
+                book.BlackAndWhite = YesNo.No
+            elif "noir" in normalize_text(illustrations):
+                book.BlackAndWhite = YesNo.Yes
+
+        # Authors
+        role_map = {
+            "scenario": "Writer",
+            "storyboard": "Writer",
+            "dessin": "Penciller",
+            "couleurs": "Colorist",
+            "colorisation": "Colorist",
+            "encrage": "Inker",
+            "couverture": "CoverArtist",
+            "lettrage": "Letterer"
+        }
+        authors = {"Writer": [], "Penciller": [], "Colorist": [], "Inker": [], "CoverArtist": [], "Letterer": []}
+        for a in BDBASE_ALBUM_AUTHOR.finditer(albumHTML):
+            name = checkWebChar(strip_tags(a.group(1))).strip()
+            role = normalize_text(a.group(2))
+            if role in role_map and name:
+                key = role_map[role]
+                if name not in authors[key]:
+                    authors[key].append(name)
+
+        if CBWriter and authors["Writer"]:
+            book.Writer = ", ".join(authors["Writer"])
+            debuglog(Trans(30), book.Writer)
+        if CBPenciller and authors["Penciller"]:
+            book.Penciller = ", ".join(authors["Penciller"])
+            debuglog(Trans(31), book.Penciller)
+        if CBColorist and authors["Colorist"]:
+            book.Colorist = ", ".join(authors["Colorist"])
+            debuglog(Trans(33), book.Colorist)
+        if CBInker and authors["Inker"]:
+            book.Inker = ", ".join(authors["Inker"])
+            debuglog(Trans(73), book.Inker)
+        if CBCouverture and authors["CoverArtist"]:
+            book.CoverArtist = ", ".join(authors["CoverArtist"])
+            debuglog(Trans(121), book.CoverArtist)
+        if CBLetterer and authors["Letterer"]:
+            book.Letterer = ", ".join(authors["Letterer"])
+            debuglog(Trans(38), book.Letterer)
+
+        # Language
+        if CBLanguage and not book.LanguageISO:
+            book.LanguageISO = "fr"
+
+        # Cover Image (disabled for BDbase)
+        if CBCover and not book.FilePath and not BDBASE_DISABLE_COVER:
+            pass
+
+        if CBNotes:
+            write_book_notes(book)
+
+    except:
+        cError = debuglogOnError()
+        log_BD("   " + pageUrl + " " + Trans(43), "", 1)
+        return False
+
+    return True
+
 def getGenericBookArtists(patterns, book_info, label):
 
     """ Parse album info for artists (writer, penciller, colorist, etc.) """
@@ -1495,7 +1692,7 @@ def getGenericBookArtists(patterns, book_info, label):
     for pattern in patterns:
         nameRegex = pattern.search(book_info, 0)
         if nameRegex:
-            # Special process for 'Indéterminé' which is not usually using a link (i.e. https://www.bedetheque.com/serie-25893-BD-June-Aredit.html)
+            # Special process for 'Indéterminé' which is not usually using a link (i.e. https://www.bdbase.fr/serie-25893-BD-June-Aredit.html)
             if '&lt;Indéterminé&gt;' in nameRegex.group(1):
                 if AcceptGenericArtists:
                     thisArtist = '<Indéterminé>'
@@ -1529,13 +1726,13 @@ def _read_url(url, bSingle):
         debuglog("Cancelled from _read_url Start")
         return page
 
-    if not bSingle and re.search("https://www.bedetheque.com/", url, re.IGNORECASE):
+    if not bSingle and re.search(r"https?://%s/" % BASE_DOMAIN, url, re.IGNORECASE):
         bSingle = True
 
     if bSingle:
         requestUri = url_fix(url)
     else:
-        requestUri = url_fix("https://www.bedetheque.com/" + url)
+        requestUri = url_fix(BASE_URL + "/" + url.lstrip("/"))
 
     try:
         System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12
@@ -1635,7 +1832,7 @@ def debuglogOnError():
     traceback = sys.exc_info()[2]
     stackTrace = []
 
-    logfile = (__file__[:-len('BedethequeScraper2.py')] + "BD2_debug_log.txt")
+    logfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
 
     print("Writing Log to " + logfile)
     print('Caught ', sys.exc_info()[0].__name__, ': ', sstr(sys.exc_info()[1]))
@@ -1675,7 +1872,7 @@ def debuglog(*args):
 
 def flush_debuglog():
     try:
-        logfile = os.path.join(os.path.dirname(__file__), "BD2_debug_log.txt")
+        logfile = os.path.join(os.path.dirname(__file__), "BDbase_debug_log.txt")
         
         with open(logfile, 'a') as log:
             log.write ("\n\n" + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + "\n")
@@ -1720,7 +1917,7 @@ def url_fix(s, charset='utf-8'):
 
 def log_BD(bdstr, bdstat, lTime):
 
-    bdlogfile = (__file__[:-len('BedethequeScraper2.py')] + "BD2_Rename_Log.txt")
+    bdlogfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
 
     bdlog = open(bdlogfile, 'a')
     if lTime == 1:
@@ -1748,7 +1945,7 @@ class ProgressBarDialog(Form):
         bStopit = False
         self.Text = Trans(62)
         self.ClientSize = System.Drawing.Size(350, 590)
-        pIcon = (__file__[:-len('BedethequeScraper2.py')] + "BD2.ico")
+        pIcon = (__file__[:-len('BDbaseScraper.py')] + "BDbase.ico")
         self.Icon = System.Drawing.Icon(pIcon)
         self.ControlBox = False
         self.HelpButton = True
@@ -1815,7 +2012,7 @@ class ProgressBarDialog(Form):
         if book:
             cCovImage = (ComicRack.App.GetComicThumbnail(book, 0))
         else:
-            cCovImage = (__file__[:-len('BedethequeScraper2.py')] + "BD2.png")
+            cCovImage = (__file__[:-len('BDbaseScraper.py')] + "BDbase.png")
 
         if nInc == 1 or not book: 
             self.cover.Image = System.Drawing.Bitmap(cCovImage)
@@ -1840,7 +2037,7 @@ def LoadSetting():
     ###############################################################
     # Config read #
 
-    path = (__file__[:-len('BedethequeScraper2.py')])
+    path = (__file__[:-len('BDbaseScraper.py')])
 
     if not File.Exists(path + "\App.Config"):
         fs = File.Create(path + "\App.Config")
@@ -2122,7 +2319,7 @@ def SaveSetting():
     elif AllowUserChoice == "2":
         MySettings.Set("CBStop",  "2")
 
-    MySettings.Save((__file__[:-len('BedethequeScraper2.py')] + "App.Config"))
+    MySettings.Save((__file__[:-len('BDbaseScraper.py')] + "App.Config"))
 
 class AppSettings(object):
 
@@ -2184,8 +2381,8 @@ class BDConfigForm(Form):
     def __init__(self):
 
         self.Name = "BDConfigForm"
-        self.Text = "Bedetheque Scraper 2"
-        pIcon = (__file__[:-len('BedethequeScraper2.py')] + "BD2.ico")
+        self.Text = "BDbase Scraper"
+        pIcon = (__file__[:-len('BDbaseScraper.py')] + "BDbase.ico")
         self.Icon = System.Drawing.Icon(pIcon)
         self.HelpButton = False
         self.MaximizeBox = False
@@ -2856,7 +3053,7 @@ class BDConfigForm(Form):
         #
         # PB1
         #
-        pImage = (__file__[:-len('BedethequeScraper2.py')] + "BD2.png")
+        pImage = (__file__[:-len('BDbaseScraper.py')] + "BDbase.png")
         self._PB1.Image = System.Drawing.Bitmap(pImage)
         self._PB1.Location = System.Drawing.Point(520, 4)
         self._PB1.Name = "PB1"
@@ -3011,7 +3208,7 @@ def Translate():
 
     global aWord
 
-    path = (__file__[:-len('BedethequeScraper2.py')])
+    path = (__file__[:-len('BDbaseScraper.py')])
     
     if not File.Exists(path + "\BDTranslations.Config"):
         log_BD("File BDTranslations.Config missing !", "Error!", 1)
@@ -3279,7 +3476,7 @@ class SeriesForm(Form):
         sel = self.list_filtered_index[self._ListSeries.SelectedIndex]
         if self.formType == FormType.SERIE: 
             title = self.List[sel][1]
-            link = "https://www.bedetheque.com/" + self.List[sel][0]
+            link = BASE_URL + "/" + self.List[sel][0].lstrip("/")
         elif self.formType == FormType.EDITION: 
             title = self.List[sel][1].Title + " (" + self.List[sel][1].A + ")"
             link = self.List[sel][1].URL
@@ -3295,10 +3492,10 @@ class SeriesForm(Form):
     def MainForm_Load(self, sender, e):
         self.Left += 365
 
-#@Key Bedetheque2
+#@Key BDbaseScraper
 #@Hook ConfigScript
-#@Name Configurer BD2
-def ConfigureBD2Quick():
+#@Name Configurer BDbase
+def ConfigureBDbaseQuick():
 
     if not LoadSetting():
         return
@@ -3311,11 +3508,11 @@ def ConfigureBD2Quick():
     else:
         SaveSetting()
 
-#@Name Configurer BD2
-#@Image BD2.png
+#@Name Configurer BDbase
+#@Image BDbase.png
 #@Hook Library
-#@Key ConfigureBD2
-def ConfigureBD2(self):
+#@Key ConfigureBDbase
+def ConfigureBDbase(self):
 
     if not LoadSetting():
         return
@@ -3328,13 +3525,13 @@ def ConfigureBD2(self):
     else:
         SaveSetting()
 
-#@Name QuickScrape BD2
-#@Image BD2Q.png
+#@Name QuickScrape BDbase
+#@Image BDbaseQ.png
 #@Hook Books
-#@Key QuickScrapeBD2
-def QuickScrapeBD2(books, book = "", cLink = False):
+#@Key QuickScrapeBDbase
+def QuickScrapeBDbase(books, book = "", cLink = False):
 
-    global LinkBD2, Numero, AlbumNumNum, dlgNumber, dlgName, nRenamed, nIgnored, dlgAltNumber, Shadow1, Shadow2, RenameSeries
+    global LinkBDbase, Numero, AlbumNumNum, dlgNumber, dlgName, nRenamed, nIgnored, dlgAltNumber, Shadow1, Shadow2, RenameSeries
 
     RetAlb = False
 
@@ -3348,7 +3545,7 @@ def QuickScrapeBD2(books, book = "", cLink = False):
         Result = MessageBox.Show(ComicRack.MainWindow, Trans(1),Trans(2), MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
         return False
 
-    LinkBD2 = ""
+    LinkBDbase = ""
 
     if not cLink:
         nRenamed = 0
@@ -3374,7 +3571,7 @@ def QuickScrapeBD2(books, book = "", cLink = False):
                 if cLink:
                     Numero = ""
                     serieUrl = cLink
-                    LinkBD2 = serieUrl
+                    LinkBDbase = serieUrl
 
                 else:
 
@@ -3419,14 +3616,14 @@ def QuickScrapeBD2(books, book = "", cLink = False):
                     scrape = DirectScrape()
                     result = scrape.ShowDialog()
 
-                    if result == DialogResult.Cancel or (LinkBD2 == ""):
+                    if result == DialogResult.Cancel or (LinkBDbase == ""):
                         return False
 
-                    if LinkBD2:
-                        serieUrl = GetFullURL(LinkBD2)
+                    if LinkBDbase:
+                        serieUrl = GetFullURL(LinkBDbase)
 
-                if LinkBD2:
-                    debuglog(Trans(104), LinkBD2)
+                if LinkBDbase:
+                    debuglog(Trans(104), LinkBDbase)
 
                 RetVal = serieUrl
                 if "/serie-" in serieUrl or '/revue-' in serieUrl: 
@@ -3434,7 +3631,7 @@ def QuickScrapeBD2(books, book = "", cLink = False):
                     RetVal = parseSerieInfo(MyBook, serieUrl, True)
 
                 if RetVal and not '/revue-' in serieUrl:
-                    if LinkBD2:
+                    if LinkBDbase:
                         RetVal = parseAlbumInfo(MyBook, RetVal, dlgNumber, True)
 
                 if RetVal:
@@ -3476,15 +3673,15 @@ def QuickScrapeBD2(books, book = "", cLink = False):
             rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + "," + Trans(18) + str(nIgnored) + "\n\n" + Trans(19), Trans(20), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1)
             if rdlg == DialogResult.Yes:
                 # open debug log automatically
-                if FileInfo(__file__[:-len('BedethequeScraper2.py')] + "BD2_Debug_Log.txt"):
-                    Start(__file__[:-len('BedethequeScraper2.py')] + "BD2_Debug_Log.txt")
+                if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt"):
+                    Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_debug_log.txt")
         elif SHOWRENLOG:
             if not cLink:
                 rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + "," + Trans(18) + str(nIgnored) + "\n\n" + Trans(21), Trans(22), MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
                 if rdlg == DialogResult.Yes:
                     # open rename log automatically
-                    if FileInfo(__file__[:-len('BedethequeScraper2.py')] + "BD2_Rename_Log.txt"):
-                        Start(__file__[:-len('BedethequeScraper2.py')] + "BD2_Rename_Log.txt")
+                    if FileInfo(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt"):
+                        Start(__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
         elif not cLink:
             rdlg = MessageBox.Show(ComicRack.MainWindow, Trans(17) + str(nRenamed) + "," + Trans(18) + str(nIgnored) , Trans(22), MessageBoxButtons.OK, MessageBoxIcon.Exclamation, MessageBoxDefaultButton.Button1)
 
@@ -3501,19 +3698,19 @@ class DirectScrape(Form):
 
         try:
             # BD
-            self._LinkBD2 = System.Windows.Forms.TextBox()
+            self._LinkBDbase = System.Windows.Forms.TextBox()
             self._labelPasteLink = System.Windows.Forms.Label()
             self._OKScrape = System.Windows.Forms.Button()
             self._CancScrape = System.Windows.Forms.Button()
             #
-            # LinkBD2
+            # LinkBDbase
             #
-            self._LinkBD2.Location = System.Drawing.Point(8, 40)
-            self._LinkBD2.Name = "LinkBD2"
-            self._LinkBD2.Size = System.Drawing.Size(646, 20)
-            self._LinkBD2.TabIndex = 1
-            self._LinkBD2.Text = ""
-            self._LinkBD2.WordWrap = False
+            self._LinkBDbase.Location = System.Drawing.Point(8, 40)
+            self._LinkBDbase.Name = "LinkBDbase"
+            self._LinkBDbase.Size = System.Drawing.Size(646, 20)
+            self._LinkBDbase.TabIndex = 1
+            self._LinkBDbase.Text = ""
+            self._LinkBDbase.WordWrap = False
             #
             # labelPasteLink
             #
@@ -3559,13 +3756,13 @@ class DirectScrape(Form):
             self.Controls.Add(self._CancScrape)
             self.Controls.Add(self._OKScrape)
             self.Controls.Add(self._labelPasteLink)
-            self.Controls.Add(self._LinkBD2)
+            self.Controls.Add(self._LinkBDbase)
             #
             self.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
             self.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
             self.Name = "ScrapeLink"
             self.Text = Trans(103)
-            pIcon = (__file__[:-len('BedethequeScraper2.py')] + "BD2.ico")
+            pIcon = (__file__[:-len('BDbaseScraper.py')] + "BDbase.ico")
             self.Icon = System.Drawing.Icon(pIcon)
             self.KeyPreview = True
 
@@ -3582,13 +3779,13 @@ class DirectScrape(Form):
 
         if sender.Name.CompareTo(self._OKScrape.Name) == 0:
 
-            global LinkBD2
+            global LinkBDbase
 
-            if not self._LinkBD2.Text:
+            if not self._LinkBDbase.Text:
                 self.Hide()
-                LinkBD2 = ""
+                LinkBDbase = ""
             else:
-                LinkBD2 = self._LinkBD2.Text
+                LinkBDbase = self._LinkBDbase.Text
 
 class HighDpiHelper:
     @staticmethod
