@@ -75,7 +75,7 @@
 - [ ] `DirectScrape` – tester et connecter à `QuickScrapeBDbase`
 
 ### Intégration & tests
-- [ ] Refactorer `BDbaseScraper.py` (Importer `scraper`, exposer les hooks)
+- [x] Refactorer `BDbaseScraper.py` (Importer `scraper`, exposer les hooks)
 - [ ] Connecter `ui_forms.py` aux options (BDConfigForm, DirectScrape, ProgressBarDialog)
 - [ ] Tester dans ComicRack (logs, couvertures, dialogues)
 
