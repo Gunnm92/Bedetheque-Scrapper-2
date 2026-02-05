@@ -10,4 +10,4 @@ __version__ = "1.00"
 __author__ = "kiwi13 & maforget"
 
 # Module exports
-__all__ = ['config', 'utils']
+__all__ = ['config', 'utils', 'settings']
