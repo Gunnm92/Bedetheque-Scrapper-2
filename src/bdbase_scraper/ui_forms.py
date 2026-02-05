@@ -23,7 +23,7 @@ import collections
 # Import from our modules
 import config
 from utils import if_else, debuglog, debuglogOnError, log_BD, Capitalize
-from settings import Trans, get_plugin_path
+from settings import LoadSetting, SaveSetting, Trans, get_plugin_path
 
 # Import ComicRack
 try:
@@ -210,9 +210,10 @@ class BDConfigForm(Form):
     def button_Click(self, sender, e):
         """Handle button clicks"""
         if sender.Name == self._OKButton.Name:
-            # TODO: Save all settings to config module
             debuglog("Config form OK clicked - saving settings")
-            pass
+            SaveSetting()
+        else:
+            debuglog("Config form cancelled")
 
 # ========================================
 # Series Selection Form
