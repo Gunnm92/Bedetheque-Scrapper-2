@@ -55,23 +55,47 @@ def normalize_text(raw_text):
 
 def parse_date_fr(raw_text):
     """
-    Parse French date format (e.g., "15 janvier 2021") and return (month, year)
-    Returns (None, None) if parsing fails
+    Parse French date formats and return (day, month, year)
+    Supports formats:
+    - "15 janvier 2021" or "15 Janvier 2021"
+    - "15/06/2011" or "15-06-2011"
+    - "06/2011" (month/year only)
+    Returns (None, None, None) if parsing fails
     """
     if not raw_text:
-        return None, None
+        return None, None, None
+
     text = normalize_text(raw_text)
+
+    # Try format: DD/MM/YYYY or DD-MM-YYYY
+    m = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', text)
+    if m:
+        day = int(m.group(1))
+        month = int(m.group(2))
+        year = int(m.group(3))
+        return day, month, year
+
+    # Try format: MM/YYYY (month/year only)
+    m = re.search(r'^(\d{1,2})[/-](\d{4})$', text.strip())
+    if m:
+        month = int(m.group(1))
+        year = int(m.group(2))
+        return None, month, year
+
+    # Try format: "15 janvier 2021"
     m = re.search(r'(\d{1,2})\s+([a-z]+)\s+(\d{4})', text)
-    if not m:
-        return None, None
-    month_map = {
-        "janvier": 1, "fevrier": 2, "mars": 3, "avril": 4,
-        "mai": 5, "juin": 6, "juillet": 7, "aout": 8, "septembre": 9,
-        "octobre": 10, "novembre": 11, "decembre": 12
-    }
-    month = month_map.get(m.group(2), None)
-    year = int(m.group(3)) if m.group(3) else None
-    return month, year
+    if m:
+        month_map = {
+            "janvier": 1, "fevrier": 2, "mars": 3, "avril": 4,
+            "mai": 5, "juin": 6, "juillet": 7, "aout": 8, "septembre": 9,
+            "octobre": 10, "novembre": 11, "decembre": 12
+        }
+        day = int(m.group(1))
+        month = month_map.get(m.group(2), None)
+        year = int(m.group(3)) if m.group(3) else None
+        return day, month, year
+
+    return None, None, None
 
 
 def extract_ld_json(html):

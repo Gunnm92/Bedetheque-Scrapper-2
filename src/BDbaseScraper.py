@@ -159,13 +159,13 @@ SERIE_STATUS = re.compile(SERIE_STATUS_PATTERN, re.IGNORECASE | re.MULTILINE | r
 SERIE_NOTE_PATTERN = r'<p\sclass="static">Note:\s<strong>\s(?P<note>[^<]*?)</strong>'
 SERIE_NOTE = re.compile(SERIE_NOTE_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_COUNT_PATTERN = r'<div\s+class="group-info">\s*<span>(\d+)\s+albums</span>'
+SERIE_COUNT_PATTERN = r'<span>(\d+)\s+albums?</span>'
 SERIE_COUNT = re.compile(SERIE_COUNT_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_COUNT_REAL_PATTERN = r'<div\s+class="group-info">(.+?)</div>'
+SERIE_COUNT_REAL_PATTERN = r'<span[^>]*>(\d+)\s+albums?</span>'
 SERIE_COUNT_REAL = re.compile(SERIE_COUNT_REAL_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
-SERIE_COUNTOF_PATTERN = r'(\d+)\s+albums'
+SERIE_COUNTOF_PATTERN = r'(\d+)\s+albums?'
 SERIE_COUNTOF = re.compile(SERIE_COUNTOF_PATTERN, re.IGNORECASE | re.MULTILINE | re.DOTALL)
 
 SERIE_HEADER2_PATTERN = r'<h3(.+?)</p'
@@ -1131,22 +1131,11 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
             book.Publisher = details.get("editeur")
             debuglog(Trans(35), book.Publisher)
 
-        pub_date_text = details.get("date de parution") or details.get("publie le")
-        if CBPrinted and pub_date_text:
-            month, year = parse_date_fr(pub_date_text)
-            if month and year:
-                book.Month = int(month)
-                book.Year = int(year)
-                debuglog(Trans(34), str(book.Month) + "/" + str(book.Year))
-            else:
-                book.Month = -1
-                book.Year = -1
-
         if CBISBN and details.get("isbn"):
             book.ISBN = details.get("isbn")
             debuglog("ISBN: ", book.ISBN)
 
-        # LD+JSON fallback for missing details
+        # LD+JSON - prioritize this for dates as it has the most accurate info
         ld = extract_ld_json(albumHTML)
         if isinstance(ld, list):
             # find first WebPage with mainEntity
@@ -1157,17 +1146,41 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
         book_data = None
         if isinstance(ld, dict):
             book_data = ld.get('mainEntity') if ld.get('@type') == 'WebPage' else ld
+
+        # Try to get date from JSON-LD first (more reliable with full date)
+        date_from_ld = False
+        if isinstance(book_data, dict) and CBPrinted:
+            dp = book_data.get('datePublished')
+            if dp and isinstance(dp, str) and '-' in dp:
+                parts = dp.split('-')
+                if len(parts) >= 2:
+                    try:
+                        book.Year = int(parts[0])
+                        book.Month = int(parts[1])
+                        if len(parts) >= 3:
+                            book.Day = int(parts[2])
+                        date_from_ld = True
+                        debuglog(Trans(34), str(book.Month) + "/" + str(book.Year))
+                    except:
+                        pass
+
+        # Fallback to HTML details if JSON-LD didn't have the date
+        if CBPrinted and not date_from_ld:
+            pub_date_text = details.get("date de parution") or details.get("publie le")
+            if pub_date_text:
+                day, month, year = parse_date_fr(pub_date_text)
+                if month and year:
+                    book.Month = int(month)
+                    book.Year = int(year)
+                    if day:
+                        book.Day = int(day)
+                    debuglog(Trans(34), str(book.Month) + "/" + str(book.Year))
+                else:
+                    book.Month = -1
+                    book.Year = -1
+
+        # Use JSON-LD for other missing details
         if isinstance(book_data, dict):
-            if CBPrinted and (book.Year == -1 or not book.Year):
-                dp = book_data.get('datePublished')
-                if dp and isinstance(dp, str) and '-' in dp:
-                    parts = dp.split('-')
-                    if len(parts) >= 2:
-                        try:
-                            book.Year = int(parts[0])
-                            book.Month = int(parts[1])
-                        except:
-                            pass
             if CBCount and (not book.PageCount or book.PageCount == 0):
                 pages = book_data.get('numberOfPages')
                 if pages and str(pages).isdigit():
