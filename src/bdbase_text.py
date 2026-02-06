@@ -161,9 +161,10 @@ def formatARTICLES(s):
 def titlize(s, formatArticles=False):
     """
     Capitalize each word in a title according to configured rules
-    Optionally format articles if FORMATARTICLES is enabled
+    Formats articles automatically if FORMATARTICLES global setting is enabled
     """
-    if formatArticles and FORMATARTICLES:
+    # Format articles if global setting is enabled (formatArticles param can override)
+    if FORMATARTICLES or formatArticles:
         s = formatARTICLES(s)
 
     if TITLEIT:

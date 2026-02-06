@@ -227,6 +227,11 @@ def BD_start(books):
     if not LoadSetting():
         return
 
+    # Sync global text processing settings with bdbase_text module
+    bdbase_text.ARTICLES = ARTICLES
+    bdbase_text.FORMATARTICLES = FORMATARTICLES
+    bdbase_text.TITLEIT = TITLEIT
+
     bdlogfile = ""
     debuglogfile = ""
 
@@ -2931,6 +2936,11 @@ def ConfigureBDbaseQuick():
     if not LoadSetting():
         return
 
+    # Sync global text processing settings with bdbase_text module
+    bdbase_text.ARTICLES = ARTICLES
+    bdbase_text.FORMATARTICLES = FORMATARTICLES
+    bdbase_text.TITLEIT = TITLEIT
+
     config = BDConfigForm()
     result = config.ShowDialog()
 
@@ -2947,6 +2957,11 @@ def ConfigureBDbase(self):
 
     if not LoadSetting():
         return
+
+    # Sync global text processing settings with bdbase_text module
+    bdbase_text.ARTICLES = ARTICLES
+    bdbase_text.FORMATARTICLES = FORMATARTICLES
+    bdbase_text.TITLEIT = TITLEIT
 
     config = BDConfigForm()
     result = config.ShowDialog()
@@ -2973,6 +2988,11 @@ def QuickScrapeBDbase(books, book = "", cLink = False):
     if not cLink:
         if not LoadSetting():
             return False
+
+        # Sync global text processing settings with bdbase_text module
+        bdbase_text.ARTICLES = ARTICLES
+        bdbase_text.FORMATARTICLES = FORMATARTICLES
+        bdbase_text.TITLEIT = TITLEIT
 
     RenameSeries = False
 
