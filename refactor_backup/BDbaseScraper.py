@@ -35,14 +35,6 @@ from urllib import *
 from urllib2 import *
 from HTMLParser import HTMLParser
 
-TITLE_CLEAN_RE = re.compile(
-    r'^(?:tome|vol(?:ume)?|t\.?|v\.?|int[ée]grale|coffret|hors[\s-]?s[ée]rie)\s*'
-    r'(?:[0-9]+|[ivxlcdm]+)?(?:\s*(?:a|à|au|&|et|\-|–|—)\s*'
-    r'(?:[0-9]+|[ivxlcdm]+))?\s*[:\-–—]?\s*',
-    re.IGNORECASE
-)
-TAG_RE_COMP = re.compile(r'<[^<>]+?>', re.IGNORECASE | re.DOTALL | re.MULTILINE)
-
 clr.AddReference('System')
 clr.AddReference('System.Windows.Forms')
 from System.Windows.Forms import * 

@@ -7,7 +7,7 @@
 ---
 
 ## 📌 Résumé exécutif
-Le monolithe `src/BDbaseScraper.py` a été restructuré en un package `src/bdbase_scraper/`. `config.py`, `utils.py` et `settings.py` sont opérationnels. `scraper.py` contient désormais les fonctions de parsing (albums, séries, revues et sélection utilisateur), tandis que `ui_forms.py` héberge l’ossature des dialogues. Reste à connecter `BD_start`, les helpers, l’UI et le point d’entrée ComicRack.
+Le monolithe `src/BDbaseScraper.py` a été restructuré en modules plats (`config.py`, `utils.py`, `settings.py`, `scraper.py`, `ui_forms.py`) directement à la racine de `src/`. `scraper.py` contient désormais les fonctions de parsing (albums, séries, revues et sélection utilisateur) et `ui_forms.py` l’ossature des dialogues. Il reste à connecter `BD_start`, les helpers, l’UI et BDbaseScraper aux nouveaux modules.
 
 ---
 

@@ -16,18 +16,14 @@ bdbasescraper/
 │
 └── 📂 src/
     ├── 📄 README.md                Documentation source
-    ├── 📄 BDbaseScraper.py         Point d'entrée original (à refactorer)
+    ├── 📄 BDbaseScraper.py         Point d’entrée original (à refactorer)
     ├── 📄 BDTranslations.Config    Traductions FR/EN
     ├── 📄 Package.ini              Configuration ComicRack
-    │
-    ├── 📂 bdbase_scraper/          ✨ Package refactoré
-    │   ├── __init__.py             Initialisation
-    │   ├── config.py               Constantes / patterns ✅
-    │   ├── utils.py                Helpers ✅
-    │   ├── settings.py             Config + traductions ✅
-    │   ├── scraper.py              Parsing + sélection ⚠️ (entry point en cours)
-    │   └── ui_forms.py             Dialogues ⚠️ (events à brancher)
-    │
+    ├── 📄 config.py                Constantes / patterns ✅
+    ├── 📄 utils.py                 Helpers ✅
+    ├── 📄 settings.py              Config + traductions ✅
+    ├── 📄 scraper.py               Parsing + sélection ⚠️ (entry point en cours)
+    ├── 📄 ui_forms.py              Dialogues ⚠️ (events à brancher)
     ├── 📂 stdlib/                  Python 2.7 stdlib (29 fichiers)
     └── 📂 assets/                  Ressources graphiques (6 fichiers)
 ```
