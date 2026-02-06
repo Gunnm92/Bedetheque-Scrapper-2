@@ -35,13 +35,19 @@ from urllib import *
 from urllib2 import *
 from HTMLParser import HTMLParser
 
+# Import utility functions from bdbase_utils module
+from bdbase_utils import (
+    sstr, isPositiveInt, isnumeric, checkWebChar, checkRegExp,
+    strip_tags, url_fix, if_else, ft, tf, GetFullURL, is_probable_album_url,
+    TAG_RE_COMP, BASE_DOMAIN, BASE_URL
+)
+
 TITLE_CLEAN_RE = re.compile(
     r'^(?:tome|vol(?:ume)?|t\.?|v\.?|int[ée]grale|coffret|hors[\s-]?s[ée]rie)\s*'
     r'(?:[0-9]+|[ivxlcdm]+)?(?:\s*(?:a|à|au|&|et|\-|–|—)\s*'
     r'(?:[0-9]+|[ivxlcdm]+))?\s*[:\-–—]?\s*',
     re.IGNORECASE
 )
-TAG_RE_COMP = re.compile(r'<[^<>]+?>', re.IGNORECASE | re.DOTALL | re.MULTILINE)
 
 clr.AddReference('System')
 clr.AddReference('System.Windows.Forms')
@@ -122,8 +128,7 @@ TimerExpired = False
 SkipAlbum = False
 log_messages = []
 
-BASE_DOMAIN = "www.bdbase.fr"
-BASE_URL = "https://www.bdbase.fr"
+# BASE_DOMAIN and BASE_URL are now imported from bdbase_utils
 BDBASE_DISABLE_COVER = True
 
 ########################################
@@ -560,15 +565,6 @@ def SetSerieId(book, serie, num, nBooksIn):
 
     return serieUrl
 
-def GetFullURL(url):
-    if url:
-        if re.search(r"https?://%s/" % BASE_DOMAIN, url, re.IGNORECASE):
-            return url
-        else:
-            return BASE_URL + "/" + url.lstrip("/")
-    else:
-        return ''
-
 def write_book_notes(book):
     book.Notes = "BDbase.fr - " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + chr(10) + "BDbase scraper v" + VERSION
 
@@ -626,7 +622,7 @@ def extract_number_from_title(raw_text):
         return "HS"
     if re.search(r'\d+\s*(?:a|à|-)\s*\d+', text):
         return ""
-    m = re.search(r'(?:tome|vol|volume|t)\s*([0-9]+)', text)
+    m = re.search(r'(?:tome|vol|volume|t)[-\s]*([0-9]+)', text)
     if m:
         return m.group(1)
     word_map = {
@@ -636,7 +632,7 @@ def extract_number_from_title(raw_text):
         "six": "6", "sept": "7", "huit": "8", "neuf": "9", "dix": "10",
         "onze": "11", "douze": "12"
     }
-    m = re.search(r'(?:tome|vol|volume|t)\s*([a-z]+)', text)
+    m = re.search(r'(?:tome|vol|volume|t)[-\s]*([a-z]+)', text)
     if m and m.group(1) in word_map:
         return word_map[m.group(1)]
     return ""
@@ -1135,7 +1131,7 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
         hs_flag = is_hors_serie_text(raw_title_main) or is_hors_serie_text(title_main) or is_hors_serie_text(pageUrl)
         if not hs_flag:
             # Drop leading volume markers to keep the true title
-            title_main = re.sub(r'^(?:tome|vol(?:ume)?|t\.?|v\.?|int[ée]grale|coffret|hors[\s-]?s[ée]rie)\s*(?:[0-9]+|[ivxlcdm]+)?(?:\s*(?:a|à|au|&|et|\-|–|—)\s*(?:[0-9]+|[ivxlcdm]+))?\s*[:\-–—]?\s*', '', title_main, flags=re.IGNORECASE).strip()
+            title_main = TITLE_CLEAN_RE.sub('', title_main).strip()
 
         if CBTitle and title_main:
             if book.Series and title_main.lower() == book.Series.lower():
@@ -1206,8 +1202,9 @@ def parseAlbumInfo_bdbase(book, pageUrl, num, albumHTML):
             book.Publisher = details.get("editeur")
             debuglog(Trans(35), book.Publisher)
 
-        if CBPrinted and details.get("date de parution"):
-            month, year = parse_date_fr(details.get("date de parution"))
+        pub_date_text = details.get("date de parution") or details.get("publie le")
+        if CBPrinted and pub_date_text:
+            month, year = parse_date_fr(pub_date_text)
             if month and year:
                 book.Month = int(month)
                 book.Year = int(year)
@@ -1420,46 +1417,6 @@ def _read_url(url, bSingle):
 
     return page
 
-def isnumeric(nNum):
-
-    try:
-        n = float(nNum)
-    except ValueError:
-        return False
-    else:
-        return True
-
-def checkWebChar(strIn):
-
-    strIn = re.sub('&lt;', '<', strIn)
-    strIn = re.sub('&gt;', '>', strIn)
-    strIn = re.sub('&amp;', '&', strIn)
-    strIn = re.sub('&nbsp;', ' ', strIn)
-    strIn = re.sub('<br />', '', strIn)
-    strIn = re.sub('&quot;', '"', strIn)
-    strIn = re.sub('\x92', '\'', strIn)
-    strIn = re.sub('\xc3', u'\xc3', strIn)
-    strIn = re.sub('\xa2', u'\xa2', strIn)
-    strIn = re.sub('\xc3', u'\xc3', strIn)
-
-    return strIn 
-
-def checkRegExp(strIn):
-
-    strIn = re.sub('\\(', '.', strIn)
-    strIn = re.sub('\\)', '.', strIn)
-    strIn = re.sub('&', '&amp;', strIn)
-    strIn = re.sub('"', '&quot;', strIn)
-    strIn = re.sub('\$', '\\$', strIn)
-
-    return strIn
-
-def strip_tags(html):
-    try:
-        return re.sub("<[^<>]+?>", "", html, flags=re.IGNORECASE | re.DOTALL | re.MULTILINE)
-    except:
-        return html
-
 def thread_proc():
 
     pass
@@ -1525,50 +1482,6 @@ def flush_debuglog():
     except Exception as e:
         print(e)
 
-def sstr(object):
-
-    ''' safely converts the given object into a  (sstr = safestr) '''
-    if object is None:
-        return '<None>'
-
-    if type(object) is str:
-        # this is needed, because str() breaks on some strings that have unicode
-        # characters, due to a python bug (all strings in python are unicode).
-        return object
-
-    return str(object)
-
-def isPositiveInt(value):
-
-    try:
-        return int(value) >= 0
-    except:
-        return False
-
-
-def is_probable_album_url(url):
-    if not url:
-        return False
-    url_l = url.lower()
-    # Album URLs often contain a numeric part (e.g. -1-, -12-)
-    if re.search(r'/bd/[^/]*-\d{1,3}(?:\b|-)\S*', url_l):
-        return True
-    # Some albums don't have a number but include a tome/volume keyword
-    if re.search(r'/bd/[^/]*(tome|volume|vol|integrale|coffret|hors[-\s]?serie|hs)[^/]*', url_l):
-        return True
-    return False
-
-def url_fix(s, charset='utf-8'):
-
-    if isinstance(s, unicode):
-        s = s.encode(charset, 'ignore')
-
-    scheme, netloc, path, qs, anchor = urlparse.urlsplit(s)
-    path = quote(path, "%/:=&~#+$!,?;'@()*[]")
-    qs = quote_plus(qs, ':&=')
-
-    return urlparse.urlunsplit((scheme, netloc, path, qs, anchor))
-
 def log_BD(bdstr, bdstat, lTime):
 
     bdlogfile = (__file__[:-len('BDbaseScraper.py')] + "BDbase_Rename_Log.txt")
@@ -1580,13 +1493,6 @@ def log_BD(bdstr, bdstat, lTime):
 
     with open(bdlogfile, 'a') as bdlog:
         bdlog.write (cDT.encode('utf-8') + bdstr.encode('utf-8') + "   " + bdstat.encode('utf-8') + "\n")
-
-def if_else(condition, trueVal, falseVal):
-
-    if condition:
-        return trueVal
-    else:
-        return falseVal
 
 class ProgressBarDialog(Form):
 
@@ -2014,22 +1920,6 @@ class AppSettings(object):
         xtw.Formatting = Formatting.Indented
         xd.WriteTo(xtw)
         rawXML = File.WriteAllText(self._FilePath, sb.ToString())
-
-def ft(n):
-    if n == "1":
-        return True
-    elif n== "0":
-        return False
-    elif n== "2":
-        return "2"
-
-def tf(bool):
-    if bool == True:
-        return "1"
-    elif bool == False:
-        return "0"
-    elif bool == "2":
-        return "2"
 
 class BDConfigForm(Form):
 
