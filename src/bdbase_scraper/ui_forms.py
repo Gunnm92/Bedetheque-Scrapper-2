@@ -21,6 +21,7 @@ from System.Drawing.Drawing2D import InterpolationMode
 import collections
 
 # Import from our modules
+from bdbase_scraper import scraper
 import config
 from utils import if_else, debuglog, debuglogOnError, log_BD, Capitalize
 from settings import LoadSetting, SaveSetting, Trans, get_plugin_path
@@ -373,8 +374,8 @@ class SeriesForm(Form):
 
         sel = self.list_filtered_index[self._ListSeries.SelectedIndex]
         if sender.Name == self._OKButton.Name and self.List[sel][1]:
-            NewLink = self.List[sel][0]
-            NewSeries = self.List[sel][1]
+            scraper.NewLink = self.List[sel][0]
+            scraper.NewSeries = self.List[sel][1]
             self.Hide()
 
     def ClearButton_Click(self, sender, e):
@@ -414,9 +415,9 @@ class SeriesForm(Form):
             return
 
         if title:
-            NewLink = link
-            NewSeries = self.List[sel][1]
-            # TODO: Call Start(NewLink) when scraper module is integrated
+            scraper.NewLink = link
+            scraper.NewSeries = self.List[sel][1]
+            self.Hide()
 
     def MainForm_Load(self, sender, e):
         """Handle form load"""
