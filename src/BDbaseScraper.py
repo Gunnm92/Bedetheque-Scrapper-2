@@ -563,7 +563,7 @@ def SetSerieId(book, serie, num, nBooksIn):
         cError = debuglogOnError()
         log_BD("** Error [" + serie + "] " + num + " - " + titlize(book.Title), cError, 1)
 
-    return serieUrl
+    return ''
 
 def write_book_notes(book):
     book.Notes = "BDbase.fr - " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + chr(10) + "BDbase scraper v" + VERSION
@@ -3390,11 +3390,13 @@ class HighDpiHelper:
     def GetDpiScale(control):
         def calculateDpiScale():
             try:
+                # Check if control is still valid before accessing it
+                if control is None or control.IsDisposed:
+                    return 1.0
                 with control.CreateGraphics() as graphics:
                     return graphics.DpiX / 96.0
             except:
-                cError = debuglogOnError()
-                log_BD("   [error]", cError, 1)
+                # Silently return default DPI if control is disposed or inaccessible
                 return 1.0
 
         return calculateDpiScale()
