@@ -42,12 +42,13 @@ from bdbase_utils import (
     TAG_RE_COMP, BASE_DOMAIN, BASE_URL
 )
 
-TITLE_CLEAN_RE = re.compile(
-    r'^(?:tome|vol(?:ume)?|t\.?|v\.?|int[ée]grale|coffret|hors[\s-]?s[ée]rie)\s*'
-    r'(?:[0-9]+|[ivxlcdm]+)?(?:\s*(?:a|à|au|&|et|\-|–|—)\s*'
-    r'(?:[0-9]+|[ivxlcdm]+))?\s*[:\-–—]?\s*',
-    re.IGNORECASE
+# Import text processing functions from bdbase_text module
+from bdbase_text import (
+    remove_accents, normalize_text, parse_date_fr, extract_ld_json,
+    extract_number_from_title, is_hors_serie_text, cleanARTICLES,
+    formatARTICLES, titlize, Capitalize, TITLE_CLEAN_RE
 )
+import bdbase_text  # Import module itself to sync global variables later
 
 clr.AddReference('System')
 clr.AddReference('System.Windows.Forms')
@@ -567,83 +568,6 @@ def SetSerieId(book, serie, num, nBooksIn):
 
 def write_book_notes(book):
     book.Notes = "BDbase.fr - " + str(datetime.now().strftime("%A %d %B %Y %H:%M:%S")) + chr(10) + "BDbase scraper v" + VERSION
-
-def remove_accents(raw_text):
-    raw_text = re.sub(u"[àáâãäåÀÁÂÄÅÃ]", 'a', raw_text)
-    raw_text = re.sub(u"[èéêëÉÈÊË]", 'e', raw_text)
-    raw_text = re.sub(u"[çÇ]", 'c', raw_text)
-    raw_text = re.sub(u"[ìíîïÍÌÎÏ]", 'i', raw_text)
-    raw_text = re.sub(u"[òóôõöÓÒÔÖÕ]", 'o', raw_text)
-    raw_text = re.sub(u"[ùúûüÚÙÛÜ]", 'u', raw_text)
-    raw_text = re.sub(u"[œŒ]", 'oe', raw_text)
-    return raw_text
-
-def normalize_text(raw_text):
-    if not raw_text:
-        return ""
-    return remove_accents(strip_tags(checkWebChar(raw_text))).lower().strip()
-
-def parse_date_fr(raw_text):
-    if not raw_text:
-        return None, None
-    text = normalize_text(raw_text)
-    m = re.search(r'(\d{1,2})\s+([a-z]+)\s+(\d{4})', text)
-    if not m:
-        return None, None
-    month_map = {
-        "janvier": 1, "fevrier": 2, "mars": 3, "avril": 4,
-        "mai": 5, "juin": 6, "juillet": 7, "aout": 8, "septembre": 9,
-        "octobre": 10, "novembre": 11, "decembre": 12
-    }
-    month = month_map.get(m.group(2), None)
-    year = int(m.group(3)) if m.group(3) else None
-    return month, year
-
-
-def extract_ld_json(html):
-    if not html:
-        return None
-    if not json:
-        return None
-    try:
-        m = re.search(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', html, re.IGNORECASE | re.DOTALL)
-        if not m:
-            return None
-        data = m.group(1).strip()
-        return json.loads(data)
-    except:
-        return None
-
-def extract_number_from_title(raw_text):
-    if not raw_text:
-        return ""
-    text = normalize_text(raw_text)
-    if re.search(r'\bhors[-\s]?serie\b', text) or re.search(r'\bhs\b', text):
-        return "HS"
-    if re.search(r'\d+\s*(?:a|à|-)\s*\d+', text):
-        return ""
-    m = re.search(r'(?:tome|vol|volume|t)[-\s]*([0-9]+)', text)
-    if m:
-        return m.group(1)
-    word_map = {
-        "un": "1", "premier": "1",
-        "deux": "2", "second": "2",
-        "trois": "3", "quatre": "4", "cinq": "5",
-        "six": "6", "sept": "7", "huit": "8", "neuf": "9", "dix": "10",
-        "onze": "11", "douze": "12"
-    }
-    m = re.search(r'(?:tome|vol|volume|t)[-\s]*([a-z]+)', text)
-    if m and m.group(1) in word_map:
-        return word_map[m.group(1)]
-    return ""
-
-def is_hors_serie_text(raw_text):
-    if not raw_text:
-        return False
-    text = normalize_text(raw_text)
-    if re.search(r'\bhors[-\s]?serie\b', text) or re.search(r'\bhs\b', text):
-        return True
-    return False
 
 def SetAlbumInformation(book, serieUrl, serie, num):
 
@@ -1819,6 +1743,11 @@ def LoadSetting():
 
     aWord = Translate()
 
+    # Sync global text processing settings with bdbase_text module
+    bdbase_text.ARTICLES = ARTICLES
+    bdbase_text.FORMATARTICLES = FORMATARTICLES
+    bdbase_text.TITLEIT = TITLEIT
+
     return True
     
 def SaveSetting():
@@ -2785,53 +2714,6 @@ def Trans(nWord):
     tText = aWord[nWord-1]
 
     return tText
-
-def cleanARTICLES(s):
-
-    ns = re.search(r"^(" + ARTICLES.replace(',','|') + ")\s*(?<=['\s])((?=[^/\r\n\(:\,!]*(?:\s[-–]\s))[^-–\r\n]*|.[^/\r\n\(:\,!]*)", s, re.IGNORECASE)
-    if ns:
-        s = ns.group(2).strip()
-    ns2 = re.search(r"^[#]*(.(?=[^/\r\n\(:\,!]*(?:\s[-–]\s))[^-–\r\n]*|.[^/\r\n\(:\,!]*)", s, re.IGNORECASE)
-    if ns2:
-        s = ns2.group(1).strip()
-
-    return s
-
-def formatARTICLES(s):
-
-    ns = re.sub(r"^(" + ARTICLES.replace(',','|') + ")\s*(?<=['\s])((?=[^(]*(?:\s[-–:]\s))[^-–:\r\n]*|[^\(/\r\n]*)(?![-–:/\(])\s*([^\r\n]*)", r"\2 (\1) \3", s, re.IGNORECASE)
-    if ns:
-        s = Capitalize(ns.strip())
-
-    return s
-
-def titlize(s, formatArticles = False):
-
-    if formatArticles and FORMATARTICLES:
-        s = formatARTICLES(s)
-
-    if TITLEIT:
-        NewString = ""
-        Ucase = False
-        for i in range(len(s.strip())):
-            if Ucase or i == 0:
-                NewString += s[i:i + 1].upper()
-            else:
-                NewString += s[i:i + 1]
-
-            if not (s[i:i + 1]).isalnum() and s[i:i + 2].lower() != "'s":
-                Ucase = True
-            else:
-                Ucase = False
-        test = s.title()
-        return NewString
-    else:
-        return s
-
-def Capitalize(s):
-
-    ns = s[0:1].upper() + s[1:]
-    return ns
 
 def ThemeMe(control):
     if ComicRack.App.ProductVersion >= '0.9.182':
